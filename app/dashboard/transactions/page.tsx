@@ -307,7 +307,8 @@ export default function TransactionsPage() {
                   {comptesForProvince.map((p) => (
                     <option key={p.compteCode} value={p.compteCode}>
                       {p.compteCode} - {p.libelle} (Dispo:{" "}
-                      {formatCurrency(p.disponible)})
+                      ```typescriptreact
+                      {formatCurrency(p.plafondEncaissement)})
                     </option>
                   ))}
                 </select>
