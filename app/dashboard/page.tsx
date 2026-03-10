@@ -400,10 +400,9 @@ export default function DashboardPage() {
         factureDate: editForm.factureDate || undefined,
         numeroAp: editForm.numeroAp,
         dateAp: editForm.dateAp || undefined,
-        moisAnnee: editModal.moisAnnee,
-        typeTransaction: editModal.typeTransaction,
-        description: editModal.description,
-        dateTransaction: editModal.dateTransaction,
+        moisAnnee: editModal.moisAnnee || undefined,
+        typeTransaction: editModal.typeTransaction || undefined,
+        description: editModal.description || undefined,
       });
       setSuccess("Transaction modifiee avec succes.");
       setEditModal(null);
