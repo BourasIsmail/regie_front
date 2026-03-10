@@ -107,6 +107,19 @@ export default function DashboardPage() {
     transaction: TransactionRegie;
     montantValide: string;
   } | null>(null);
+
+  // Edit transaction modal state (for DELEGATION on EN_ATTENTE)
+  const [editModal, setEditModal] = useState<TransactionRegie | null>(null);
+  const [editForm, setEditForm] = useState({
+    montant: "",
+    fournisseur: "",
+    adresseFournisseur: "",
+    factureNumero: "",
+    factureDate: "",
+    numeroAp: "",
+    dateAp: "",
+  });
+
   const [alimenterForm, setAlimenterForm] = useState({
     montant: "",
     op: "",
@@ -346,6 +359,60 @@ export default function DashboardPage() {
           err instanceof ApiError
               ? err.message
               : "Erreur lors de la confirmation."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Open edit modal for pending transaction
+  const openEditModal = (tx: TransactionRegie) => {
+    setEditModal(tx);
+    setEditForm({
+      montant: String(tx.montant),
+      fournisseur: tx.fournisseur || "",
+      adresseFournisseur: tx.adresseFournisseur || "",
+      factureNumero: tx.factureNumero || "",
+      factureDate: tx.factureDate || "",
+      numeroAp: tx.numeroAp || "",
+      dateAp: tx.dateAp || "",
+    });
+  };
+
+  // Submit edit transaction
+  const handleEditTransaction = async () => {
+    if (!editModal) return;
+    const montant = Number(editForm.montant);
+    if (isNaN(montant) || montant <= 0) {
+      setError("Veuillez entrer un montant valide.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      await transactionsApi.update(editModal.id, {
+        provinceId: editModal.provinceId,
+        compteCode: editModal.compteCode,
+        montant,
+        fournisseur: editForm.fournisseur,
+        adresseFournisseur: editForm.adresseFournisseur,
+        factureNumero: editForm.factureNumero,
+        factureDate: editForm.factureDate || null,
+        numeroAp: editForm.numeroAp,
+        dateAp: editForm.dateAp || null,
+        moisAnnee: editModal.moisAnnee,
+        typeTransaction: editModal.typeTransaction,
+        description: editModal.description,
+        dateTransaction: editModal.dateTransaction,
+      });
+      setSuccess("Transaction modifiee avec succes.");
+      setEditModal(null);
+      await fetchPlafonds();
+    } catch (err) {
+      setError(
+          err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la modification."
       );
     } finally {
       setSubmitting(false);
@@ -956,6 +1023,19 @@ export default function DashboardPage() {
                                         </Button>
                                       </>
                                   )}
+                                  {/* Edit button for all roles on pending transactions */}
+                                  {tx.statut === "EN_ATTENTE" && (
+                                      <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                          title="Modifier"
+                                          onClick={() => openEditModal(tx)}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                  )}
+                                  {/* Delete button */}
                                   <Button
                                       size="sm"
                                       variant="ghost"
@@ -963,14 +1043,6 @@ export default function DashboardPage() {
                                       title="Supprimer"
                                   >
                                     <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                                      title="Modifier"
-                                  >
-                                    <Pencil className="h-4 w-4" />
                                   </Button>
                                   <Button
                                       size="sm"
@@ -1228,6 +1300,157 @@ export default function DashboardPage() {
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
                       Confirmer
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+        )}
+
+        {/* Edit Transaction Modal (for DELEGATION on EN_ATTENTE) */}
+        {editModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                <div className="mb-6 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1A3A8A]">
+                      <Pencil className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-bold text-[#0A1A44]">
+                      Modifier la Transaction
+                    </h3>
+                  </div>
+                  <button
+                      onClick={() => setEditModal(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  {/* Montant */}
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                      Montant (DH) *
+                    </label>
+                    <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editForm.montant}
+                        onChange={(e) =>
+                            setEditForm((f) => ({ ...f, montant: e.target.value }))
+                        }
+                        className="h-11"
+                        placeholder="0.00"
+                    />
+                  </div>
+
+                  {/* Fournisseur */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                        Fournisseur
+                      </label>
+                      <Input
+                          value={editForm.fournisseur}
+                          onChange={(e) =>
+                              setEditForm((f) => ({ ...f, fournisseur: e.target.value }))
+                          }
+                          className="h-11"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                        Adresse Fournisseur
+                      </label>
+                      <Input
+                          value={editForm.adresseFournisseur}
+                          onChange={(e) =>
+                              setEditForm((f) => ({ ...f, adresseFournisseur: e.target.value }))
+                          }
+                          className="h-11"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Facture */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                        Facture N
+                      </label>
+                      <Input
+                          value={editForm.factureNumero}
+                          onChange={(e) =>
+                              setEditForm((f) => ({ ...f, factureNumero: e.target.value }))
+                          }
+                          className="h-11"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                        Date Facture
+                      </label>
+                      <Input
+                          type="date"
+                          value={editForm.factureDate}
+                          onChange={(e) =>
+                              setEditForm((f) => ({ ...f, factureDate: e.target.value }))
+                          }
+                          className="h-11"
+                      />
+                    </div>
+                  </div>
+
+                  {/* AP */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                        Numero AP
+                      </label>
+                      <Input
+                          value={editForm.numeroAp}
+                          onChange={(e) =>
+                              setEditForm((f) => ({ ...f, numeroAp: e.target.value }))
+                          }
+                          className="h-11"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                        Date AP
+                      </label>
+                      <Input
+                          type="date"
+                          value={editForm.dateAp}
+                          onChange={(e) =>
+                              setEditForm((f) => ({ ...f, dateAp: e.target.value }))
+                          }
+                          className="h-11"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                        onClick={() => setEditModal(null)}
+                        variant="outline"
+                        className="flex-1 h-11"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                        onClick={handleEditTransaction}
+                        disabled={submitting || !editForm.montant}
+                        className="flex-1 h-11 bg-[#1A3A8A] text-white hover:bg-[#0A1A44]"
+                    >
+                      {submitting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Enregistrer
                     </Button>
                   </div>
                 </div>
