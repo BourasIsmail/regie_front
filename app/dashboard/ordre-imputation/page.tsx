@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { regionsApi, transactionsApi, plafondsApi } from "@/lib/api";
-import type { Region, PlafondRegie, TransactionRegie } from "@/lib/types";
+import { regionsApi, transactionsApi, plafondsApi, provincesApi } from "@/lib/api";
+import type { Region, Province, PlafondRegie, TransactionRegie } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,7 +46,9 @@ function formatDateFR(dateStr: string) {
 export default function OrdreImputationPage() {
   const { user } = useAuth();
   const [regions, setRegions] = useState<Region[]>([]);
+  const [provinces, setProvinces] = useState<Province[]>([]);
   const [selectedRegion, setSelectedRegion] = useState("");
+  const [selectedProvince, setSelectedProvince] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingTotals, setLoadingTotals] = useState(false);
   const [rubriqueTotals, setRubriqueTotals] = useState<RubriqueTotal[]>([]);
@@ -87,14 +89,37 @@ export default function OrdreImputationPage() {
     fetchRegions();
   }, [fetchRegions]);
 
+  // Fetch provinces when region changes
+  useEffect(() => {
+    if (selectedRegion) {
+      provincesApi.getByRegion(Number(selectedRegion)).then(setProvinces).catch(() => setProvinces([]));
+    } else {
+      setProvinces([]);
+    }
+    setSelectedProvince("");
+  }, [selectedRegion]);
+
   const handleLoadTotals = async () => {
     if (!selectedRegion) return;
     setLoadingTotals(true);
     try {
-      const [transactions, plafonds] = await Promise.all([
-        transactionsApi.getByRegion(Number(selectedRegion)),
-        plafondsApi.getByRegion(Number(selectedRegion)),
-      ]);
+      // Fetch transactions and plafonds based on province or region
+      let transactions: TransactionRegie[];
+      let plafonds: PlafondRegie[];
+
+      if (selectedProvince) {
+        // Filter by province
+        [transactions, plafonds] = await Promise.all([
+          transactionsApi.getByProvince(Number(selectedProvince)),
+          plafondsApi.getByProvince(Number(selectedProvince)),
+        ]);
+      } else {
+        // Filter by region (all provinces)
+        [transactions, plafonds] = await Promise.all([
+          transactionsApi.getByRegion(Number(selectedRegion)),
+          plafondsApi.getByRegion(Number(selectedRegion)),
+        ]);
+      }
 
       // Filter only CONFIRMEE transactions
       const confirmedTransactions = transactions.filter(
@@ -417,6 +442,27 @@ export default function OrdreImputationPage() {
                   {regions.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
+                      </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Province (optionnel)
+                </Label>
+                <select
+                    className="h-10 min-w-[250px] rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:opacity-50"
+                    value={selectedProvince}
+                    onChange={(e) => {
+                      setSelectedProvince(e.target.value);
+                      setRubriqueTotals([]);
+                    }}
+                    disabled={!selectedRegion || provinces.length === 0}
+                >
+                  <option value="">-- Toutes les Provinces --</option>
+                  {provinces.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
                       </option>
                   ))}
                 </select>

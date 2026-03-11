@@ -630,7 +630,7 @@ export default function DashboardPage() {
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[500px] overflow-auto">
                       <table className="w-full min-w-[1400px] border-separate border-spacing-0 text-sm">
                         <thead>
                         <tr className="bg-gradient-to-r from-[#0A1A44] to-[#1A3A8A]">
