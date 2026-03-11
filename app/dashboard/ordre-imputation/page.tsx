@@ -206,10 +206,14 @@ export default function OrdreImputationPage() {
     return (
         <>
           <style>{`
+          @page {
+            size: A4 landscape;
+            margin: 10mm;
+          }
           @media print {
             body { background: white; padding: 0; margin: 0; }
             .print-btn-container { display: none !important; }
-            .page { box-shadow: none; margin: 0; padding: 10mm; width: 100%; }
+            .page { box-shadow: none; margin: 0; padding: 10mm; width: 100%; height: auto; min-height: auto; }
             nav, header, .dashboard-nav, [class*="navbar"], [class*="header"] { display: none !important; }
           }
         `}</style>
@@ -236,8 +240,8 @@ export default function OrdreImputationPage() {
               ref={printRef}
               className="page mx-auto bg-white shadow-lg"
               style={{
-                width: "210mm",
-                minHeight: "297mm",
+                width: "297mm",
+                minHeight: "210mm",
                 padding: "15mm",
                 fontFamily: '"Times New Roman", Times, serif',
               }}
