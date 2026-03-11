@@ -163,11 +163,33 @@ export default function OrdreImputationPage() {
     );
   }
 
-  // Print View
+  // Get month name in French
+  const getMoisFR = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return "Mois  " + d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  };
+
+  // Format amount with spaces for thousands
+  const formatMontant = (value: number) => {
+    return value.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Print View - Exact format from provided JSX template
   if (showPrint) {
+    const regionName = regions.find((r) => String(r.id) === selectedRegion)?.name || "";
+
     return (
-        <div>
-          <div className="mb-4 flex items-center gap-3 print:hidden">
+        <>
+          <style>{`
+          @media print {
+            body { background: white; padding: 0; margin: 0; }
+            .print-btn-container { display: none !important; }
+            .page { box-shadow: none; margin: 0; padding: 10mm; width: 100%; }
+            nav, header, .dashboard-nav, [class*="navbar"], [class*="header"] { display: none !important; }
+          }
+        `}</style>
+
+          <div className="print-btn-container mb-4 flex items-center gap-3">
             <Button
                 variant="outline"
                 onClick={() => setShowPrint(false)}
@@ -187,226 +209,171 @@ export default function OrdreImputationPage() {
 
           <div
               ref={printRef}
-              className="mx-auto max-w-[297mm] bg-card p-8 font-sans text-foreground print:max-w-none print:p-5"
+              className="page mx-auto bg-white shadow-lg"
+              style={{
+                width: "210mm",
+                minHeight: "297mm",
+                padding: "15mm",
+                fontFamily: '"Times New Roman", Times, serif',
+              }}
           >
-            {/* Print Header */}
-            <div className="mb-6 text-center">
-              <h1 className="text-xl font-bold tracking-widest underline">
-                {"ORDRE D'IMPUTATION"}
-              </h1>
-              <p className="mt-1 text-sm font-bold">
-                VEUILLEZ COMPTABILISER AU JOURNAL
-              </p>
-            </div>
+            {/* Outer Border */}
+            <div style={{ border: "2px solid #000", width: "100%", height: "100%", padding: 0 }}>
 
-            {/* Top Info */}
-            <div className="mb-5 flex justify-between text-[13px]">
-              <div className="w-3/5">
-                <div className="mb-2">
-                  <span className="font-bold">{"Nature de l'operation:"}</span>{" "}
-                  <span className="inline-block min-w-[200px] border-b border-dotted border-foreground pb-px">
-                  REGIE{" "}
-                    {regions.find((r) => String(r.id) === selectedRegion)?.name}
-                </span>
+              {/* Title Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", borderBottom: "2px solid #000" }}>
+                <div style={{ textAlign: "center", padding: "6px 10px", fontSize: "22px", fontWeight: "bold", letterSpacing: "2px", borderRight: "2px solid #000" }}>
+                  {"ORDRE D'IMPUTATION"}
                 </div>
-                <div className="mb-2">
-                <span className="font-bold">
-                  Suivant pieces justificatives:
-                </span>{" "}
-                  <span className="inline-block min-w-[200px] border-b border-dotted border-foreground pb-px">
-                  Voir pieces ci jointes
-                </span>
-                </div>
-                <div>
-                  <span className="font-bold">Periode du:</span>{" "}
-                  <span className="inline-block min-w-[80px] border-b border-dotted border-foreground pb-px">
-                  {formatDateFR(periodeDebut)}
-                </span>{" "}
-                  <span className="font-bold">au:</span>{" "}
-                  <span className="inline-block min-w-[80px] border-b border-dotted border-foreground pb-px">
-                  {formatDateFR(periodeFin)}
-                </span>
-                </div>
-              </div>
-              <div className="w-[35%] text-right">
-                <div className="mb-2">
-                  <span className="font-bold">{"N:"}</span>{" "}
-                  <span className="inline-block min-w-[100px] border-b border-dotted border-foreground pb-px">
-                  {oiNumero}
-                </span>
-                </div>
-                <div>
-                  <span className="font-bold">du:</span>{" "}
-                  <span className="inline-block min-w-[100px] border-b border-dotted border-foreground pb-px">
-                  {formatDateFR(oiDate)}
-                </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Table */}
-            <table className="mb-4 w-full border-collapse text-xs">
-              <thead>
-              <tr>
-                <th
-                    colSpan={2}
-                    className="border border-foreground bg-secondary/50 px-2 py-1.5 text-center font-bold"
-                >
-                  COMPTE
-                </th>
-                <th
-                    rowSpan={2}
-                    className="border border-foreground bg-secondary/50 px-2 py-1.5 text-center font-bold"
-                    style={{ width: "46%" }}
-                >
-                  {"INTITULE"}
-                </th>
-                <th
-                    colSpan={2}
-                    className="border border-foreground bg-secondary/50 px-2 py-1.5 text-center font-bold"
-                >
-                  MONTANT
-                </th>
-              </tr>
-              <tr>
-                <th
-                    className="border border-foreground bg-secondary/50 px-2 py-1.5 text-center font-bold"
-                    style={{ width: "12%" }}
-                >
-                  {"a Debiter"}
-                </th>
-                <th
-                    className="border border-foreground bg-secondary/50 px-2 py-1.5 text-center font-bold"
-                    style={{ width: "12%" }}
-                >
-                  {"a Crediter"}
-                </th>
-                <th
-                    className="border border-foreground bg-secondary/50 px-2 py-1.5 text-center font-bold"
-                    style={{ width: "15%" }}
-                >
-                  {"a Debiter"}
-                </th>
-                <th
-                    className="border border-foreground bg-secondary/50 px-2 py-1.5 text-center font-bold"
-                    style={{ width: "15%" }}
-                >
-                  {"a Crediter"}
-                </th>
-              </tr>
-              </thead>
-              <tbody>
-              {selectedItems.map((item) => (
-                  <tr key={item.code}>
-                    <td className="border border-foreground px-2 py-1.5 text-center font-mono">
-                      {item.code}
-                    </td>
-                    <td className="border border-foreground px-2 py-1.5" />
-                    <td className="border border-foreground px-3 py-1.5 text-left">
-                      {item.libelle}
-                    </td>
-                    <td className="border border-foreground px-2 py-1.5 text-center">
-                      {formatCurrencyDH(item.totalDepensesValidees)}
-                    </td>
-                    <td className="border border-foreground px-2 py-1.5" />
-                  </tr>
-              ))}
-              {/* Regie credit row */}
-              <tr>
-                <td className="border border-foreground px-2 py-1.5" />
-                <td className="border border-foreground px-2 py-1.5 text-center font-mono">
-                  5165-130
-                </td>
-                <td className="border border-foreground px-3 py-1.5 text-left">
-                  Regie
-                </td>
-                <td className="border border-foreground px-2 py-1.5" />
-                <td className="border border-foreground px-2 py-1.5 text-center">
-                  {formatCurrencyDH(totalDebiter)}
-                </td>
-              </tr>
-              {/* Total row */}
-              <tr className="bg-secondary/40 font-bold">
-                <td
-                    colSpan={3}
-                    className="border border-foreground px-2 py-2 text-right"
-                >
-                  {"TOTAL GENERAL"}
-                </td>
-                <td className="border border-foreground px-2 py-2 text-center">
-                  {formatCurrencyDH(totalDebiter)}
-                </td>
-                <td className="border border-foreground px-2 py-2 text-center">
-                  {formatCurrencyDH(totalDebiter)}
-                </td>
-              </tr>
-              </tbody>
-            </table>
-
-            {/* Budget Box */}
-            <div className="mb-5 border border-foreground p-3 text-[13px]">
-            <span className="mb-2 block font-bold underline">
-              {"IMPUTATION BUDGETAIRE"}
-            </span>
-              <div className="flex gap-8">
-                <div>
-                  <span className="font-bold">Chapitre:</span>{" "}
-                  <span className="inline-block min-w-[80px] border-b border-dotted border-foreground" />
-                </div>
-                <div>
-                  <span className="font-bold">Article:</span>{" "}
-                  <span className="inline-block min-w-[80px] border-b border-dotted border-foreground" />
-                </div>
-                <div>
-                  <span className="font-bold">Paragraphe:</span>{" "}
-                  <span className="inline-block min-w-[80px] border-b border-dotted border-foreground" />
-                </div>
-              </div>
-              <div className="mt-4 flex gap-12">
-                <div>
-                  <span className="font-bold">Credit disponible:</span>{" "}
-                  <span className="inline-block min-w-[150px] border-b border-dotted border-foreground" />
-                </div>
-                <div>
-                  <span className="font-bold">Visa:</span>{" "}
-                  <span className="inline-block min-w-[150px] border-b border-dotted border-foreground" />
-                </div>
-              </div>
-            </div>
-
-            {/* Signatures */}
-            <div className="grid grid-cols-5 border-l border-t border-foreground">
-              {[
-                "Chef de Service",
-                "Chef de division",
-                "Journal / N Ecriture\nDate",
-                "Le Tresorier Payeur",
-                "L'Ordonnateur",
-              ].map((label) => (
-                  <div
-                      key={label}
-                      className="flex h-24 flex-col justify-between border-b border-r border-foreground p-2 text-center text-[11px] font-bold"
-                  >
-                    <span className="whitespace-pre-line">{label}</span>
-                    <span />
+                <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", minWidth: "130px" }}>
+                  <div style={{ display: "flex", alignItems: "center", padding: "4px 10px", fontSize: "13px", borderBottom: "1px solid #000", gap: "8px" }}>
+                    <span>{"N°"}</span>
+                    <span style={{ fontWeight: "bold", fontSize: "16px", marginLeft: "auto" }}>{oiNumero}</span>
                   </div>
-              ))}
-            </div>
+                  <div style={{ display: "flex", alignItems: "center", padding: "4px 10px", fontSize: "13px", gap: "8px" }}>
+                    <span>du</span>
+                    <span style={{ marginLeft: "auto" }}>{formatDateFR(oiDate)}</span>
+                  </div>
+                </div>
+              </div>
 
-            {/* Footer */}
-            <div className="mt-5 text-center text-[10px] text-muted-foreground">
-              Document genere le{" "}
-              {new Date().toLocaleDateString("fr-FR", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              par {user?.email}
+              {/* Journal Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", borderBottom: "1px solid #000" }}>
+                <div style={{ padding: "5px 10px", fontSize: "12px", letterSpacing: "0.5px", borderRight: "2px solid #000" }}>
+                  VEUILLEZ COMPTABILISER AU JOURNAL
+                </div>
+                <div style={{ minWidth: "130px", padding: "5px 10px", fontSize: "11px" }} />
+              </div>
+
+              {/* Nature Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", borderBottom: "1px solid #000", alignItems: "center" }}>
+                <div style={{ padding: "5px 10px", fontSize: "12px", whiteSpace: "nowrap", borderRight: "1px solid #000", minWidth: "155px" }}>
+                  {"Nature de l'operation :"}
+                </div>
+                <div style={{ padding: "5px 10px", fontSize: "13px", fontWeight: "bold", letterSpacing: "1px" }}>
+                  {"REGIE " + regionName.toUpperCase()}
+                </div>
+              </div>
+
+              {/* Suivant + Budget Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", borderBottom: "1px solid #000" }}>
+                <div style={{ borderRight: "2px solid #000", padding: "8px 10px" }}>
+                  <div style={{ fontSize: "12px", marginBottom: "4px" }}>Suivant pieces justificatives :</div>
+                  <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "2px" }}>Voir pieces ci jointes</div>
+                  <div style={{ fontSize: "12px", marginBottom: "12px" }}>{getMoisFR(periodeDebut)}</div>
+                  <div style={{ fontSize: "14px", fontWeight: "bold", marginTop: "6px" }}>
+                    {"Montant a alimenter : " + formatMontant(totalDebiter) + " dhs"}
+                  </div>
+                </div>
+                <div style={{ padding: "6px 10px" }}>
+                  <div style={{ textAlign: "center", fontSize: "12px", fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px", letterSpacing: "0.5px" }}>
+                    IMPUTATION BUDGETAIRE
+                  </div>
+                  {["Chapitre", "Article", "Paragraphe", "Credit disponible", "Visa :"].map((item) => (
+                      <div key={item} style={{ fontSize: "11.5px", padding: "1.5px 0", display: "flex", justifyContent: "space-between" }}>
+                        <span>{item}</span>
+                        {item === "Visa :" && <span style={{ fontSize: "16px" }}>$</span>}
+                      </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Accounts Table */}
+              <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px solid #000" }}>
+                <thead>
+                <tr>
+                  <th colSpan={2} style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center", fontWeight: "bold", width: "140px" }}>
+                    {"N° Compte"}
+                  </th>
+                  <th rowSpan={2} style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center", fontWeight: "bold" }}>
+                    INTITULE
+                  </th>
+                  <th colSpan={2} style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center", fontWeight: "bold", width: "220px" }}>
+                    MONTANT
+                  </th>
+                </tr>
+                <tr>
+                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "center", width: "70px" }}>
+                    {"a Debiter"}
+                  </th>
+                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "center", width: "70px" }}>
+                    {"a Crediter"}
+                  </th>
+                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "right", width: "110px" }}>
+                    {"a Debiter"}
+                  </th>
+                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "right", width: "110px" }}>
+                    {"a Crediter"}
+                  </th>
+                </tr>
+                </thead>
+                <tbody>
+                {selectedItems.map((item) => (
+                    <tr key={item.code}>
+                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }}>
+                        {item.code}
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }} />
+                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "left" }}>
+                        {item.libelle}
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }}>
+                        {formatMontant(item.totalDepensesValidees)}
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }} />
+                    </tr>
+                ))}
+                {/* Regie credit row */}
+                <tr>
+                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }} />
+                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }}>
+                    5165-130
+                  </td>
+                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "left" }}>
+                    {"Regie " + regionName}
+                  </td>
+                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }} />
+                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }}>
+                    {formatMontant(totalDebiter)}
+                  </td>
+                </tr>
+                {/* Empty filler rows */}
+                {Array.from({ length: 3 }).map((_, i) => (
+                    <tr key={`empty-${i}`} style={{ height: "22px" }}>
+                      <td style={{ border: "1px solid #000" }} />
+                      <td style={{ border: "1px solid #000" }} />
+                      <td style={{ border: "1px solid #000" }} />
+                      <td style={{ border: "1px solid #000" }} />
+                      <td style={{ border: "1px solid #000" }} />
+                    </tr>
+                ))}
+                </tbody>
+              </table>
+
+              {/* Signature Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderTop: "2px solid #000" }}>
+                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
+                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>Chef de Service</div>
+                </div>
+                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
+                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>Chef de division</div>
+                </div>
+                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "left", minHeight: "70px" }}>
+                  <div style={{ fontSize: "11px" }}>Journal................................</div>
+                  <div style={{ fontSize: "11px", marginTop: "4px" }}>{"N° Ecriture..........................."}</div>
+                  <div style={{ fontSize: "11px", marginTop: "4px" }}>Date.........................................</div>
+                </div>
+                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
+                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>Le Tresorier Payeur</div>
+                </div>
+                <div style={{ padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
+                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>{"L'Ordonnateur"}</div>
+                </div>
+              </div>
+
             </div>
           </div>
-        </div>
+        </>
     );
   }
 
@@ -567,7 +534,7 @@ export default function OrdreImputationPage() {
                       const isSelected = selectedRubriques.has(r.code);
                       return (
                           <tr
-                              key={r.code}
+                              key={`${r.code}-${i}`}
                               className={`border-b border-border/60 transition-colors ${
                                   isSelected
                                       ? "bg-[#3B82F6]/[0.08]"
