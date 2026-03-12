@@ -2,8 +2,9 @@
 
 import React from "react";
 import { useEffect, useState, useCallback } from "react";
-import { historiqueApi, regionsApi } from "@/lib/api";
-import type { HistoriqueAlimentation, Region } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
+import { historiqueApi, regionsApi, provincesApi } from "@/lib/api";
+import type { HistoriqueAlimentation, Region, Province } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,12 +79,15 @@ function getTypeBadge(type: string | null) {
 }
 
 export default function HistoriquePage() {
+  const { user } = useAuth();
   const [historique, setHistorique] = useState<HistoriqueAlimentation[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [provinces, setProvinces] = useState<Province[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
   const [filterRegion, setFilterRegion] = useState("");
+  const [filterProvince, setFilterProvince] = useState("");
   const [filterCompte, setFilterCompte] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterDateStart, setFilterDateStart] = useState("");
@@ -92,31 +96,68 @@ export default function HistoriquePage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, regionsData] = await Promise.all([
-        historiqueApi.getAll(),
+      let data: HistoriqueAlimentation[];
+
+      // Filter data based on user role
+      if (user?.role === "PROV" && user.provinceId) {
+        // PROV can only see their province's history
+        data = await historiqueApi.getByProvince(user.provinceId);
+      } else if (user?.role === "REGION" && user.regionId) {
+        // REGION can see all provinces in their region
+        data = await historiqueApi.getByRegion(user.regionId);
+      } else {
+        // ADMIN can see all
+        data = await historiqueApi.getAll();
+      }
+
+      const [regionsData, provincesData] = await Promise.all([
         regionsApi.getAll(),
+        provincesApi.getAll(),
       ]);
       setHistorique(data);
       setRegions(regionsData);
+      setProvinces(provincesData);
+
+      // Pre-set filters based on user role
+      if (user?.role === "PROV" && user.provinceId) {
+        const prov = provincesData.find((p) => p.id === user.provinceId);
+        if (prov) {
+          setFilterRegion(String(prov.regionId));
+          setFilterProvince(String(user.provinceId));
+        }
+      } else if (user?.role === "REGION" && user.regionId) {
+        setFilterRegion(String(user.regionId));
+      }
     } catch {
       // Silently handle
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (user) {
+      fetchData();
+    }
+  }, [fetchData, user]);
 
   // Get unique compte codes
   const uniqueComptes = Array.from(new Set(historique.map((h) => h.compteCode)));
+
+  // Get provinces for selected region
+  const filteredProvinces = filterRegion
+      ? provinces.filter(p => p.regionId === Number(filterRegion))
+      : provinces;
 
   // Apply filters
   const filtered = historique.filter((h) => {
     // Region filter - use regionId directly
     const matchRegion = filterRegion
         ? h.regionId === Number(filterRegion)
+        : true;
+    // Province filter
+    const matchProvince = filterProvince
+        ? h.provinceId === Number(filterProvince)
         : true;
     const matchCompte = filterCompte ? h.compteCode === filterCompte : true;
     const matchType = filterType
@@ -128,11 +169,17 @@ export default function HistoriquePage() {
     const matchDateEnd = filterDateEnd
         ? new Date(h.createdAt) <= new Date(filterDateEnd + "T23:59:59")
         : true;
-    return matchRegion && matchCompte && matchType && matchDateStart && matchDateEnd;
+    return matchRegion && matchProvince && matchCompte && matchType && matchDateStart && matchDateEnd;
   });
 
   const resetFilters = () => {
-    setFilterRegion("");
+    // Only reset filters that user can change
+    if (user?.role === "ADMIN") {
+      setFilterRegion("");
+    }
+    if (user?.role !== "PROV") {
+      setFilterProvince("");
+    }
     setFilterCompte("");
     setFilterType("");
     setFilterDateStart("");
@@ -217,20 +264,44 @@ export default function HistoriquePage() {
               Filtrer l{"'"}historique
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {/* Region filter - only for ADMIN */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-muted-foreground">
                 Region
               </label>
               <select
-                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-50"
                   value={filterRegion}
-                  onChange={(e) => setFilterRegion(e.target.value)}
+                  onChange={(e) => {
+                    setFilterRegion(e.target.value);
+                    setFilterProvince("");
+                  }}
+                  disabled={user?.role === "REGION" || user?.role === "PROV"}
               >
                 <option value="">Toutes les regions</option>
                 {regions.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name}
+                    </option>
+                ))}
+              </select>
+            </div>
+            {/* Province filter - for ADMIN and REGION */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Province
+              </label>
+              <select
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-50"
+                  value={filterProvince}
+                  onChange={(e) => setFilterProvince(e.target.value)}
+                  disabled={user?.role === "PROV"}
+              >
+                <option value="">Toutes les provinces</option>
+                {filteredProvinces.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
                     </option>
                 ))}
               </select>

@@ -1,6 +1,6 @@
 import { getCookie, setCookie, removeCookie } from "@/lib/cookies";
 
-const API_BASE_URL = /*"http://localhost:8080/api"*/"http://172.16.20.181:8080/api";
+const API_BASE_URL = /*"http://localhost:8080/api"*/ "http://172.16.20.181:8080/api";
 
 interface ApiOptions {
   method?: string;
@@ -119,11 +119,12 @@ import type {
 } from "@/lib/types";
 
 // ========================
-// Regions API (Admin)
+// Regions API (accessible by all authenticated users)
 // ========================
 export const regionsApi = {
-  getAll: () => apiRequest<Region[]>("/admin/regions"),
-  getById: (id: number) => apiRequest<Region>(`/admin/regions/${id}`),
+  getAll: () => apiRequest<Region[]>("/regions"),
+  getById: (id: number) => apiRequest<Region>(`/regions/${id}`),
+  // Admin only methods
   create: (data: { name: string }) =>
       apiRequest<Region>("/admin/regions", { method: "POST", body: data }),
   update: (id: number, data: { name: string }) =>
@@ -133,13 +134,14 @@ export const regionsApi = {
 };
 
 // ========================
-// Provinces API (Admin)
+// Provinces API (accessible by all authenticated users)
 // ========================
 export const provincesApi = {
-  getAll: () => apiRequest<Province[]>("/admin/provinces"),
-  getById: (id: number) => apiRequest<Province>(`/admin/provinces/${id}`),
+  getAll: () => apiRequest<Province[]>("/provinces"),
+  getById: (id: number) => apiRequest<Province>(`/provinces/${id}`),
   getByRegion: (regionId: number) =>
-      apiRequest<Province[]>(`/admin/provinces/region/${regionId}`),
+      apiRequest<Province[]>(`/provinces/region/${regionId}`),
+  // Admin only methods
   create: (data: { name: string; regionId: number }) =>
       apiRequest<Province>("/admin/provinces", { method: "POST", body: data }),
   update: (id: number, data: { name: string; regionId: number }) =>

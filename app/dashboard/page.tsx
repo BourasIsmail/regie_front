@@ -138,13 +138,17 @@ export default function DashboardPage() {
       setRegions(regionsData);
       setProvinces(provincesData);
 
-      // If user has a province, auto-select it
-      if (user?.provinceId) {
+      // Pre-fill filters based on user role
+      if (user?.role === "PROV" && user.provinceId) {
+        // PROV: pre-fill and lock both region and province
         setSelectedProvince(user.provinceId);
         const prov = provincesData.find((p) => p.id === user.provinceId);
         if (prov) {
           setSelectedRegion(prov.regionId);
         }
+      } else if (user?.role === "REGION" && user.regionId) {
+        // REGION: pre-fill and lock region only
+        setSelectedRegion(user.regionId);
       }
     } catch {
       setError("Erreur lors du chargement des donnees.");
@@ -487,12 +491,13 @@ export default function DashboardPage() {
                 Choisissez la Region
               </label>
               <select
-                  className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                  className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:cursor-not-allowed disabled:opacity-60"
                   value={selectedRegion}
                   onChange={(e) => {
                     setSelectedRegion(e.target.value ? Number(e.target.value) : "");
                     setSelectedProvince("");
                   }}
+                  disabled={user?.role === "REGION" || user?.role === "PROV"}
               >
                 <option value="">-- Selectionnez une Region --</option>
                 {regions.map((r) => (
@@ -507,12 +512,12 @@ export default function DashboardPage() {
                 Choisissez une Ville
               </label>
               <select
-                  className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                  className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:cursor-not-allowed disabled:opacity-60"
                   value={selectedProvince}
                   onChange={(e) =>
                       setSelectedProvince(e.target.value ? Number(e.target.value) : "")
                   }
-                  disabled={!selectedRegion}
+                  disabled={!selectedRegion || user?.role === "PROV"}
               >
                 <option value="">-- Selectionnez une Ville --</option>
                 {filteredProvinces.map((p) => (

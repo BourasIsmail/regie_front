@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
     label: "Historique",
     href: "/dashboard/historique",
     icon: History,
-    roles: ["ADMIN", "REGION"],
+    roles: ["ADMIN", "REGION", "PROV"],
   },
   {
     label: "Ordre d'Imputation",
@@ -84,7 +84,7 @@ export function DashboardTopbar() {
               Gestion des Regies
             </span>
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Entraide Nationale
+              Cour des Comptes
             </span>
             </div>
           </div>

@@ -66,6 +66,7 @@ export default function PlafondsPage() {
 
   // Filters
   const [filterRegion, setFilterRegion] = useState<string>("");
+  const [filterProvince, setFilterProvince] = useState<string>("");
   const [filterCompte, setFilterCompte] = useState<string>("");
   const [filtersApplied, setFiltersApplied] = useState(false);
 
@@ -77,6 +78,7 @@ export default function PlafondsPage() {
     dateOp: "",
     numCheque: "",
     dateCheque: "",
+    commentaire: "",
   });
 
   const fetchData = useCallback(async () => {
@@ -90,12 +92,25 @@ export default function PlafondsPage() {
       setPlafonds(plafondsData);
       setProvinces(provincesData);
       setRegions(regionsData);
+
+      // Pre-fill filters based on user role
+      if (user?.role === "PROV" && user.provinceId) {
+        const prov = provincesData.find((p) => p.id === user.provinceId);
+        if (prov) {
+          setFilterRegion(String(prov.regionId));
+          setFilterProvince(String(user.provinceId));
+          setFiltersApplied(true);
+        }
+      } else if (user?.role === "REGION" && user.regionId) {
+        setFilterRegion(String(user.regionId));
+        setFiltersApplied(true);
+      }
     } catch {
       setError("Erreur lors du chargement des plafonds.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchData();
@@ -149,6 +164,7 @@ export default function PlafondsPage() {
         dateOp: avanceForm.dateOp || undefined,
         numCheque: avanceForm.numCheque || undefined,
         dateCheque: avanceForm.dateCheque || undefined,
+        commentaire: avanceForm.commentaire || undefined,
       });
       setAvanceModal(null);
       setAvanceForm({
@@ -157,6 +173,7 @@ export default function PlafondsPage() {
         dateOp: "",
         numCheque: "",
         dateCheque: "",
+        commentaire: "",
       });
       await fetchData();
     } catch (err) {
@@ -175,13 +192,24 @@ export default function PlafondsPage() {
   };
 
   const resetFilters = () => {
-    setFilterRegion("");
+    // Only reset filters that user can change
+    if (user?.role === "ADMIN") {
+      setFilterRegion("");
+    }
+    if (user?.role !== "PROV") {
+      setFilterProvince("");
+    }
     setFilterCompte("");
-    setFiltersApplied(false);
+    setFiltersApplied(user?.role === "REGION" || user?.role === "PROV");
   };
 
   // Get unique compte codes for filter dropdown
   const uniqueComptes = Array.from(new Set(plafonds.map((p) => p.compteCode)));
+
+  // Get provinces for selected region
+  const filteredProvinces = filterRegion
+      ? provinces.filter(p => p.regionId === Number(filterRegion))
+      : provinces;
 
   // Filter plafonds
   const filtered = filtersApplied
@@ -190,8 +218,11 @@ export default function PlafondsPage() {
         const matchRegion = filterRegion
             ? prov?.regionId === Number(filterRegion)
             : true;
+        const matchProvince = filterProvince
+            ? p.provinceId === Number(filterProvince)
+            : true;
         const matchCompte = filterCompte ? p.compteCode === filterCompte : true;
-        return matchRegion && matchCompte;
+        return matchRegion && matchProvince && matchCompte;
       })
       : [];
 
@@ -255,20 +286,42 @@ export default function PlafondsPage() {
               Filtrer les donnees
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-muted-foreground">
                 Region
               </label>
               <select
-                  className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                  className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:cursor-not-allowed disabled:opacity-60"
                   value={filterRegion}
-                  onChange={(e) => setFilterRegion(e.target.value)}
+                  onChange={(e) => {
+                    setFilterRegion(e.target.value);
+                    setFilterProvince("");
+                  }}
+                  disabled={user?.role === "REGION" || user?.role === "PROV"}
               >
                 <option value="">Toutes les regions</option>
                 {regions.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name}
+                    </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Province
+              </label>
+              <select
+                  className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  value={filterProvince}
+                  onChange={(e) => setFilterProvince(e.target.value)}
+                  disabled={user?.role === "PROV"}
+              >
+                <option value="">Toutes les provinces</option>
+                {filteredProvinces.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
                     </option>
                 ))}
               </select>
@@ -628,6 +681,18 @@ export default function PlafondsPage() {
                         value={avanceForm.dateCheque}
                         onChange={(e) =>
                             setAvanceForm({ ...avanceForm, dateCheque: e.target.value })
+                        }
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs font-semibold">Commentaire</Label>
+                    <textarea
+                        className="h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                        placeholder="Ajouter un commentaire (optionnel)"
+                        value={avanceForm.commentaire}
+                        onChange={(e) =>
+                            setAvanceForm({ ...avanceForm, commentaire: e.target.value })
                         }
                     />
                   </div>

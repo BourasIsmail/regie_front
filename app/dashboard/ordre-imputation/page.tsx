@@ -76,28 +76,45 @@ export default function OrdreImputationPage() {
   const fetchRegions = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await regionsApi.getAll();
-      setRegions(data);
+      const [regionsData, provincesData] = await Promise.all([
+        regionsApi.getAll(),
+        provincesApi.getAll(),
+      ]);
+      setRegions(regionsData);
+
+      // Pre-fill filters based on user role
+      if (user?.role === "PROV" && user.provinceId) {
+        const prov = provincesData.find((p) => p.id === user.provinceId);
+        if (prov) {
+          setSelectedRegion(String(prov.regionId));
+          setSelectedProvince(String(user.provinceId));
+          // Load provinces for the region
+          const regionProvinces = provincesData.filter((p) => p.regionId === prov.regionId);
+          setProvinces(regionProvinces);
+        }
+      } else if (user?.role === "REGION" && user.regionId) {
+        setSelectedRegion(String(user.regionId));
+        const regionProvinces = provincesData.filter((p) => p.regionId === user.regionId);
+        setProvinces(regionProvinces);
+      }
     } catch {
       // silently handle
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchRegions();
   }, [fetchRegions]);
 
-  // Fetch provinces when region changes
+  // Fetch provinces when region changes (only if not pre-filled by role)
   useEffect(() => {
-    if (selectedRegion) {
+    if (selectedRegion && user?.role === "ADMIN") {
       provincesApi.getByRegion(Number(selectedRegion)).then(setProvinces).catch(() => setProvinces([]));
-    } else {
-      setProvinces([]);
+      setSelectedProvince("");
     }
-    setSelectedProvince("");
-  }, [selectedRegion]);
+  }, [selectedRegion, user?.role]);
 
   const handleLoadTotals = async () => {
     if (!selectedRegion) return;
@@ -435,12 +452,13 @@ export default function OrdreImputationPage() {
                   Region Administrative
                 </Label>
                 <select
-                    className="h-10 min-w-[250px] rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                    className="h-10 min-w-[250px] rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:cursor-not-allowed disabled:opacity-60"
                     value={selectedRegion}
                     onChange={(e) => {
                       setSelectedRegion(e.target.value);
                       setRubriqueTotals([]);
                     }}
+                    disabled={user?.role === "REGION" || user?.role === "PROV"}
                 >
                   <option value="">-- Selectionner la Region --</option>
                   {regions.map((r) => (
@@ -455,13 +473,13 @@ export default function OrdreImputationPage() {
                   Province (optionnel)
                 </Label>
                 <select
-                    className="h-10 min-w-[250px] rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:opacity-50"
+                    className="h-10 min-w-[250px] rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:cursor-not-allowed disabled:opacity-60"
                     value={selectedProvince}
                     onChange={(e) => {
                       setSelectedProvince(e.target.value);
                       setRubriqueTotals([]);
                     }}
-                    disabled={!selectedRegion || provinces.length === 0}
+                    disabled={!selectedRegion || provinces.length === 0 || user?.role === "PROV"}
                 >
                   <option value="">-- Toutes les Provinces --</option>
                   {provinces.map((p) => (
