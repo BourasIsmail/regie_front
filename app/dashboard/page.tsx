@@ -324,12 +324,17 @@ export default function DashboardPage() {
   // Print autorisation PDF for a transaction
   const handlePrintAutorisation = async (tx: TransactionRegie) => {
     const plafond = plafonds.find((p) => p.compteCode === tx.compteCode);
-    const disponibleAnnuel = plafond
-        ? plafond.plafondAnnuel - transactions.filter(t => t.compteCode === plafond.compteCode).reduce((s, t) => s + t.montant, 0)
+    // Calculate credit disponible BEFORE this transaction was deducted
+    // We add back the current transaction amount to show the previous balance
+    const totalDepenses = transactions
+        .filter(t => t.compteCode === plafond?.compteCode && t.id !== tx.id)
+        .reduce((s, t) => s + t.montant, 0);
+    const disponibleAvantDepense = plafond
+        ? plafond.plafondAnnuel - totalDepenses
         : 0;
     await generateAutorisationPDF({
       numeroAp: tx.numeroAp || String(tx.id),
-      disponible: disponibleAnnuel,
+      disponible: disponibleAvantDepense,
       compteCode: tx.compteCode,
       libelle: plafond?.libelle || "",
       fournisseur: tx.fournisseur || "",
