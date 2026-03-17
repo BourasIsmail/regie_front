@@ -355,12 +355,9 @@ export default function DashboardPage() {
   const handlePrintAutorisation = async (tx: TransactionRegie) => {
     const plafond = plafonds.find((p) => p.compteCode === tx.compteCode);
     // Calculate credit disponible BEFORE this transaction was deducted
-    // We add back the current transaction amount to show the previous balance
-    const totalDepenses = transactions
-        .filter(t => t.compteCode === plafond?.compteCode && t.id !== tx.id)
-        .reduce((s, t) => s + t.montant, 0);
+    // Current encaissement + this transaction's montant = balance before this expense
     const disponibleAvantDepense = plafond
-        ? plafond.plafondAnnuel - totalDepenses
+        ? plafond.plafondEncaissement + tx.montant
         : 0;
     await generateAutorisationPDF({
       numeroAp: tx.numeroAp || String(tx.id),

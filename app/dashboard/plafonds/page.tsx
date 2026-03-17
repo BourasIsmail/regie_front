@@ -530,6 +530,7 @@ export default function PlafondsPage() {
                   <Input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={form.plafondAnnuel}
                       onChange={(e) =>
                           setForm({ ...form, plafondAnnuel: Number(e.target.value) })
@@ -563,6 +564,7 @@ export default function PlafondsPage() {
                   <Input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={form.plafondMaxFacture}
                       onChange={(e) =>
                           setForm({ ...form, plafondMaxFacture: Number(e.target.value) })
