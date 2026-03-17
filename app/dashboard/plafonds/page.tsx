@@ -31,7 +31,7 @@ import {
   RefreshCw,
   X,
   Info,
-  LayoutGrid,
+  LayoutGrid, Save,
 } from "lucide-react";
 
 function formatCurrency(value: number) {
