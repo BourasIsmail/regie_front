@@ -331,8 +331,15 @@ export default function DashboardPage() {
     try {
       await transactionsApi.delete(tx.id);
       setSuccess("Depense supprimee avec succes. Le montant a ete restitue.");
-      await fetchTransactions();
-      await fetchPlafonds();
+      // Refresh plafonds and remove the deleted transaction from state
+      const [plafondsData, transactionsData] = await Promise.all([
+        plafondsApi.getAll(),
+        transactionsApi.getAll(),
+      ]);
+      if (selectedProvince) {
+        setPlafonds(plafondsData.filter((p) => p.provinceId === selectedProvince));
+        setTransactions(transactionsData.filter((t) => t.provinceId === selectedProvince));
+      }
     } catch (err) {
       setError(
           err instanceof ApiError
