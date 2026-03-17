@@ -321,6 +321,29 @@ export default function DashboardPage() {
     }
   };
 
+  // Delete a transaction and restore montant to encaissement
+  const handleDeleteTransaction = async (tx: TransactionRegie) => {
+    if (!confirm(`Etes-vous sur de vouloir supprimer cette depense ?\n\nFournisseur: ${tx.fournisseur}\nMontant: ${tx.montant.toLocaleString("fr-FR")} DH\n\nLe montant sera restitue au credit disponible.`)) {
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      await transactionsApi.delete(tx.id);
+      setSuccess("Depense supprimee avec succes. Le montant a ete restitue.");
+      await fetchTransactions();
+      await fetchPlafonds();
+    } catch (err) {
+      setError(
+          err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la suppression."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Print autorisation PDF for a transaction
   const handlePrintAutorisation = async (tx: TransactionRegie) => {
     const plafond = plafonds.find((p) => p.compteCode === tx.compteCode);
@@ -1044,15 +1067,19 @@ export default function DashboardPage() {
                                         <Pencil className="h-4 w-4" />
                                       </Button>
                                   )}
-                                  {/* Delete button */}
-                                  <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                                      title="Supprimer"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  {/* Delete button - only for ADMIN (all statuses) */}
+                                  {user?.role === "ADMIN" && (
+                                      <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                          title="Supprimer"
+                                          onClick={() => handleDeleteTransaction(tx)}
+                                          disabled={submitting}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                  )}
                                   <Button
                                       size="sm"
                                       variant="ghost"
