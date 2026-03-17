@@ -31,7 +31,7 @@ import {
   RefreshCw,
   X,
   Info,
-  LayoutGrid, Save,
+  LayoutGrid,
 } from "lucide-react";
 
 function formatCurrency(value: number) {
@@ -546,6 +546,7 @@ export default function PlafondsPage() {
                   <Input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={form.plafondEncaissement}
                       onChange={(e) =>
                           setForm({ ...form, plafondEncaissement: Number(e.target.value) })
