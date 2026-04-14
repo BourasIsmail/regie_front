@@ -48,6 +48,7 @@ const emptyForm = {
   compteCode: "",
   libelle: "",
   plafondAnnuel: 0,
+  budgetAnnuelInitial: 0,
   plafondEncaissement: 0,
   plafondMaxFacture: 0,
 };
@@ -145,6 +146,7 @@ export default function PlafondsPage() {
       compteCode: p.compteCode,
       libelle: p.libelle,
       plafondAnnuel: p.plafondAnnuel,
+      budgetAnnuelInitial: p.budgetAnnuelInitial || 0,
       plafondEncaissement: p.plafondEncaissement,
       plafondMaxFacture: p.plafondMaxFacture,
     });
@@ -395,7 +397,7 @@ export default function PlafondsPage() {
               </div>
           ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
+                <table className="w-full min-w-[1050px] border-separate border-spacing-0 text-sm">
                   <thead>
                   <tr className="bg-secondary/30">
                     <th className="h-12 border-b border-border px-4 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -409,6 +411,9 @@ export default function PlafondsPage() {
                     </th>
                     <th className="h-12 border-b border-border px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Plafond Annuel
+                    </th>
+                    <th className="h-12 border-b border-border px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Budget Initial
                     </th>
                     <th className="h-12 border-b border-border px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Encaissement
@@ -438,6 +443,9 @@ export default function PlafondsPage() {
                         <td className="h-14 px-4 text-foreground">{p.libelle}</td>
                         <td className="h-14 px-4 text-right font-semibold text-foreground">
                           {formatCurrency(p.plafondAnnuel)}
+                        </td>
+                        <td className="h-14 px-4 text-right font-semibold text-[#1A3A8A]">
+                          {formatCurrency(p.budgetAnnuelInitial || 0)}
                         </td>
                         <td className="h-14 px-4 text-right font-semibold text-foreground">
                           {formatCurrency(p.plafondEncaissement)}
@@ -540,6 +548,22 @@ export default function PlafondsPage() {
                   />
                   <span className="text-[10px] text-muted-foreground">
                   Budget annuel maximum pour cette rubrique
+                </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-semibold">Budget Annuel Initial (DH)</Label>
+                  <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.budgetAnnuelInitial}
+                      onChange={(e) =>
+                          setForm({ ...form, budgetAnnuelInitial: Number(e.target.value) })
+                      }
+                      placeholder="0.00"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                  Budget fixe de reference (ne change pas avec les alimentations)
                 </span>
                 </div>
                 <div className="flex flex-col gap-2">

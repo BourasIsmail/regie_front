@@ -27,6 +27,7 @@ export interface PlafondRegie {
   compteCode: string;
   libelle: string;
   plafondAnnuel: number;
+  budgetAnnuelInitial: number | null;
   plafondEncaissement: number;
   plafondMaxFacture: number;
 }
@@ -41,6 +42,7 @@ export interface TransactionRegie {
   statut: "EN_ATTENTE" | "CONFIRMEE" | "REJETEE";
   validatedBy: string | null;
   validatedAt: string | null;
+  motifRejet: string | null;
   fournisseur: string | null;
   adresseFournisseur: string | null;
   factureNumero: string | null;
@@ -90,6 +92,7 @@ export interface PlafondRegieRequest {
   compteCode: string;
   libelle: string;
   plafondAnnuel: number;
+  budgetAnnuelInitial?: number;
   plafondEncaissement: number;
   plafondMaxFacture: number;
 }

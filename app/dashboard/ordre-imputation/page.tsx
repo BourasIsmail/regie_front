@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { regionsApi, transactionsApi, plafondsApi, provincesApi } from "@/lib/api";
 import type { Region, Province, PlafondRegie, TransactionRegie } from "@/lib/types";
@@ -23,7 +23,11 @@ interface RubriqueTotal {
   encaissement: number;
   maxFacture: number;
   totalDepensesValidees: number;
+  transactions: TransactionRegie[]; // List of transactions for this rubrique
 }
+
+// Region name for "Siege Central"
+const SIEGE_CENTRAL_NAME = "Siege central";
 
 function formatCurrencyDH(value: number) {
   return (
@@ -55,6 +59,12 @@ export default function OrdreImputationPage() {
   const [selectedRubriques, setSelectedRubriques] = useState<Set<string>>(
       new Set()
   );
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(
+      new Set()
+  );
+  const [expandedRubriques, setExpandedRubriques] = useState<Set<string>>(
+      new Set()
+  );
   const [showPrint, setShowPrint] = useState(false);
 
   // Form fields
@@ -64,8 +74,9 @@ export default function OrdreImputationPage() {
   const [oiDate, setOiDate] = useState(
       new Date().toISOString().split("T")[0]
   );
+  // Period filter - date-based (like historique)
   const [periodeDebut, setPeriodeDebut] = useState(
-      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`
+      `${new Date().getFullYear()}-01-01`
   );
   const [periodeFin, setPeriodeFin] = useState(
       new Date().toISOString().split("T")[0]
@@ -138,36 +149,68 @@ export default function OrdreImputationPage() {
         ]);
       }
 
-      // Filter only CONFIRMEE transactions
-      const confirmedTransactions = transactions.filter(
-          (tx: TransactionRegie) => tx.statut === "CONFIRMEE"
-      );
+      // Filter only CONFIRMEE transactions within the selected period
+      const confirmedTransactions = transactions.filter((tx: TransactionRegie) => {
+        if (tx.statut !== "CONFIRMEE") return false;
 
-      // Build rubriques with totals from confirmed transactions
-      const results: RubriqueTotal[] = plafonds.map((p: PlafondRegie) => {
-        // Calculate total validated expenses for this rubrique
-        const totalDepenses = confirmedTransactions
-            .filter((tx: TransactionRegie) => tx.compteCode === p.compteCode)
-            .reduce((sum: number, tx: TransactionRegie) => sum + (tx.montantValide || 0), 0);
+        // Filter by period using date range (based on factureDate)
+        const txDateStr = tx.factureDate;
+        if (!txDateStr) return false; // Exclude transactions without factureDate
 
-        return {
-          code: p.compteCode,
-          libelle: p.libelle,
-          plafondAnnuel: p.plafondAnnuel,
-          encaissement: p.plafondEncaissement,
-          maxFacture: p.plafondMaxFacture,
-          totalDepensesValidees: totalDepenses,
-        };
+        const txDate = new Date(txDateStr);
+        let startDate = new Date(periodeDebut);
+        let endDate = new Date(periodeFin);
+
+        // Swap dates if they are reversed (startDate > endDate)
+        if (startDate > endDate) {
+          const temp = startDate;
+          startDate = endDate;
+          endDate = temp;
+        }
+
+        // Set time to start/end of day for proper comparison
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        txDate.setHours(12, 0, 0, 0); // Set to midday to avoid timezone issues
+
+        return txDate >= startDate && txDate <= endDate;
       });
+
+      // Build rubriques with totals and transactions list
+      // Only include rubriques that have transactions in the selected period
+      const results: RubriqueTotal[] = plafonds
+          .map((p: PlafondRegie) => {
+            const rubriqueTransactions = confirmedTransactions
+                .filter((tx: TransactionRegie) => tx.compteCode === p.compteCode);
+
+            const totalDepenses = rubriqueTransactions
+                .reduce((sum: number, tx: TransactionRegie) => sum + (tx.montantValide || 0), 0);
+
+            return {
+              code: p.compteCode,
+              libelle: p.libelle,
+              plafondAnnuel: p.plafondAnnuel,
+              encaissement: p.plafondEncaissement,
+              maxFacture: p.plafondMaxFacture,
+              totalDepensesValidees: totalDepenses,
+              transactions: rubriqueTransactions,
+            };
+          })
+          .filter((r) => r.transactions.length > 0); // Only show rubriques with transactions in period
 
       setRubriqueTotals(results);
 
-      // Auto-select rubriques with validated expenses > 0
-      const autoSelected = new Set<string>();
+      // Auto-select rubriques and their transactions with validated expenses > 0
+      const autoSelectedRubriques = new Set<string>();
+      const autoSelectedTransactions = new Set<number>();
       for (const r of results) {
-        if (r.totalDepensesValidees > 0) autoSelected.add(r.code);
+        if (r.totalDepensesValidees > 0) {
+          autoSelectedRubriques.add(r.code);
+          r.transactions.forEach(tx => autoSelectedTransactions.add(tx.id));
+        }
       }
-      setSelectedRubriques(autoSelected);
+      setSelectedRubriques(autoSelectedRubriques);
+      setSelectedTransactions(autoSelectedTransactions);
     } catch {
       // silently handle
     } finally {
@@ -176,7 +219,55 @@ export default function OrdreImputationPage() {
   };
 
   const toggleRubrique = (code: string) => {
+    const rubrique = rubriqueTotals.find(r => r.code === code);
     setSelectedRubriques((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+        // Deselect all transactions of this rubrique
+        if (rubrique) {
+          setSelectedTransactions(prevTx => {
+            const nextTx = new Set(prevTx);
+            rubrique.transactions.forEach(tx => nextTx.delete(tx.id));
+            return nextTx;
+          });
+        }
+      } else {
+        next.add(code);
+        // Select all transactions of this rubrique
+        if (rubrique) {
+          setSelectedTransactions(prevTx => {
+            const nextTx = new Set(prevTx);
+            rubrique.transactions.forEach(tx => nextTx.add(tx.id));
+            return nextTx;
+          });
+        }
+      }
+      return next;
+    });
+  };
+
+  const toggleTransaction = (txId: number, rubriqueCode: string) => {
+    setSelectedTransactions((prev) => {
+      const next = new Set(prev);
+      if (next.has(txId)) next.delete(txId);
+      else next.add(txId);
+      return next;
+    });
+    // If at least one transaction is selected, select the rubrique
+    const rubrique = rubriqueTotals.find(r => r.code === rubriqueCode);
+    if (rubrique) {
+      const hasSelectedTx = rubrique.transactions.some(tx =>
+          tx.id === txId ? !selectedTransactions.has(txId) : selectedTransactions.has(tx.id)
+      );
+      if (hasSelectedTx) {
+        setSelectedRubriques(prev => new Set(prev).add(rubriqueCode));
+      }
+    }
+  };
+
+  const toggleExpandRubrique = (code: string) => {
+    setExpandedRubriques((prev) => {
       const next = new Set(prev);
       if (next.has(code)) next.delete(code);
       else next.add(code);
@@ -184,9 +275,18 @@ export default function OrdreImputationPage() {
     });
   };
 
-  const selectedItems = rubriqueTotals.filter(
-      (r) => selectedRubriques.has(r.code) && r.totalDepensesValidees > 0
-  );
+  // Calculate selected items based on selected transactions
+  const selectedItems = rubriqueTotals
+      .filter((r) => selectedRubriques.has(r.code))
+      .map((r) => ({
+        ...r,
+        transactions: r.transactions.filter(tx => selectedTransactions.has(tx.id)),
+        totalDepensesValidees: r.transactions
+            .filter(tx => selectedTransactions.has(tx.id))
+            .reduce((sum, tx) => sum + (tx.montantValide || 0), 0),
+      }))
+      .filter((r) => r.totalDepensesValidees > 0);
+
   const totalDebiter = selectedItems.reduce((s, r) => s + r.totalDepensesValidees, 0);
 
   const handlePrint = () => {
@@ -306,7 +406,7 @@ export default function OrdreImputationPage() {
                 <div style={{ borderRight: "2px solid #000", padding: "8px 10px" }}>
                   <div style={{ fontSize: "12px", marginBottom: "4px" }}>Suivant pieces justificatives :</div>
                   <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "2px" }}>Voir pieces ci jointes</div>
-                  <div style={{ fontSize: "12px", marginBottom: "12px" }}>{getMoisFR(periodeDebut)}</div>
+                  <div style={{ fontSize: "12px", marginBottom: "12px" }}>Periode: {new Date(periodeDebut).toLocaleDateString("fr-FR")} - {new Date(periodeFin).toLocaleDateString("fr-FR")}</div>
                   <div style={{ fontSize: "14px", fontWeight: "bold", marginTop: "6px" }}>
                     {"Montant a alimenter : " + formatMontant(totalDebiter) + " dhs"}
                   </div>
@@ -354,8 +454,8 @@ export default function OrdreImputationPage() {
                 </tr>
                 </thead>
                 <tbody>
-                {selectedItems.map((item) => (
-                    <tr key={item.code}>
+                {selectedItems.map((item, idx) => (
+                    <tr key={`${item.code}-${idx}`}>
                       <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }}>
                         {item.code}
                       </td>
@@ -413,7 +513,9 @@ export default function OrdreImputationPage() {
                   <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>Le Tresorier Payeur</div>
                 </div>
                 <div style={{ padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>{"L'Ordonnateur"}</div>
+                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>
+                    {regionName.toLowerCase().includes("siege") || regionName.toLowerCase().includes("siège") ? "L'Ordonnateur" : "Le Sous-Ordonnateur"}
+                  </div>
                 </div>
               </div>
 
@@ -489,18 +591,42 @@ export default function OrdreImputationPage() {
                   ))}
                 </select>
               </div>
-              <Button
-                  onClick={handleLoadTotals}
-                  disabled={!selectedRegion || loadingTotals}
-                  className="bg-gradient-to-r from-[#1A3A8A] to-[#0A1A44] text-white shadow-md hover:shadow-lg"
-              >
-                {loadingTotals ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                    <FileText className="mr-2 h-4 w-4" />
-                )}
-                Charger les Totaux par Rubrique
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Periode du
+                </Label>
+                <Input
+                    type="date"
+                    value={periodeDebut}
+                    onChange={(e) => setPeriodeDebut(e.target.value)}
+                    className="h-10 min-w-[150px]"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Au
+                </Label>
+                <Input
+                    type="date"
+                    value={periodeFin}
+                    onChange={(e) => setPeriodeFin(e.target.value)}
+                    className="h-10 min-w-[150px]"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                    onClick={handleLoadTotals}
+                    disabled={!selectedRegion || loadingTotals}
+                    className="bg-gradient-to-r from-[#1A3A8A] to-[#0A1A44] text-white shadow-md hover:shadow-lg"
+                >
+                  {loadingTotals ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                      <FileText className="mr-2 h-4 w-4" />
+                  )}
+                  Charger les Totaux par Rubrique
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -526,10 +652,10 @@ export default function OrdreImputationPage() {
               </div>
               <div className="p-7">
                 {/* Order form fields */}
-                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="flex flex-col gap-2">
                     <Label className="text-xs font-semibold text-muted-foreground">
-                      {"N d'Ordre d'Imputation"}
+                      {"N° d'Ordre d'Imputation"}
                     </Label>
                     <Input
                         value={oiNumero}
@@ -547,35 +673,18 @@ export default function OrdreImputationPage() {
                         onChange={(e) => setOiDate(e.target.value)}
                     />
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">
-                      Periode du
-                    </Label>
-                    <Input
-                        type="date"
-                        value={periodeDebut}
-                        onChange={(e) => setPeriodeDebut(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">
-                      Periode au
-                    </Label>
-                    <Input
-                        type="date"
-                        value={periodeFin}
-                        onChange={(e) => setPeriodeFin(e.target.value)}
-                    />
-                  </div>
                 </div>
 
-                {/* Rubriques table */}
+                {/* Rubriques table with expandable transactions */}
                 <div className="overflow-x-auto rounded-xl border border-border">
                   <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
                     <thead>
                     <tr className="bg-gradient-to-r from-[#0A1A44] to-[#1A3A8A]">
                       <th className="h-12 w-[50px] border-r border-white/10 px-4 text-center text-[11.5px] font-semibold uppercase tracking-widest text-white">
-                        Selection
+                        Sel.
+                      </th>
+                      <th className="h-12 w-[50px] border-r border-white/10 px-4 text-center text-[11.5px] font-semibold uppercase tracking-widest text-white">
+                        Details
                       </th>
                       <th className="h-12 border-r border-white/10 px-4 text-left text-[11.5px] font-semibold uppercase tracking-widest text-white" style={{ width: "100px" }}>
                         Code
@@ -583,82 +692,110 @@ export default function OrdreImputationPage() {
                       <th className="h-12 border-r border-white/10 px-4 text-left text-[11.5px] font-semibold uppercase tracking-widest text-white" style={{ minWidth: "200px" }}>
                         Rubrique
                       </th>
-                      <th className="h-12 border-r border-white/10 px-4 text-right text-[11.5px] font-semibold uppercase tracking-widest text-white" style={{ width: "120px" }}>
-                        Plafond Annuel
-                      </th>
-                      <th className="h-12 border-r border-white/10 px-4 text-right text-[11.5px] font-semibold uppercase tracking-widest text-white" style={{ width: "120px" }}>
-                        Encaissement
-                      </th>
-                      <th className="h-12 border-r border-white/10 px-4 text-right text-[11.5px] font-semibold uppercase tracking-widest text-white" style={{ width: "120px" }}>
-                        Max Facture
+                      <th className="h-12 border-r border-white/10 px-4 text-right text-[11.5px] font-semibold uppercase tracking-widest text-white" style={{ width: "100px" }}>
+                        Nb Depenses
                       </th>
                       <th className="h-12 px-4 text-right text-[11.5px] font-semibold uppercase tracking-widest text-white" style={{ width: "150px" }}>
-                        Depenses Validees
+                        Total Selectionne
                       </th>
                     </tr>
                     </thead>
                     <tbody>
                     {rubriqueTotals.map((r, i) => {
                       const isSelected = selectedRubriques.has(r.code);
+                      const isExpanded = expandedRubriques.has(r.code);
+                      const selectedTxCount = r.transactions.filter(tx => selectedTransactions.has(tx.id)).length;
+                      const selectedTotal = r.transactions
+                          .filter(tx => selectedTransactions.has(tx.id))
+                          .reduce((sum, tx) => sum + (tx.montantValide || 0), 0);
+
                       return (
-                          <tr
-                              key={`${r.code}-${i}`}
-                              className={`border-b border-border/60 transition-colors ${
-                                  isSelected
-                                      ? "bg-[#3B82F6]/[0.08]"
-                                      : i % 2 === 0
-                                          ? "bg-card"
-                                          : "bg-secondary/20"
-                              }`}
-                          >
-                            <td className="h-14 px-4 text-center">
-                              <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => toggleRubrique(r.code)}
-                                  disabled={r.totalDepensesValidees <= 0}
-                                  className="h-4 w-4 cursor-pointer accent-[#1A3A8A]"
-                              />
-                            </td>
-                            <td
-                                className={`h-14 px-4 font-mono font-semibold ${isSelected ? "text-[#1A3A8A]" : "text-foreground"}`}
+                          <React.Fragment key={`${r.code}-${i}`}>
+                            <tr
+                                className={`border-b border-border/60 transition-colors ${
+                                    isSelected
+                                        ? "bg-[#3B82F6]/[0.08]"
+                                        : i % 2 === 0
+                                            ? "bg-card"
+                                            : "bg-secondary/20"
+                                }`}
                             >
-                              {r.code}
-                            </td>
-                            <td
-                                className={`h-14 px-4 ${isSelected ? "font-semibold text-[#1A3A8A]" : "text-foreground"}`}
-                            >
-                              {r.libelle}
-                            </td>
-                            <td className="h-14 px-4 text-right text-muted-foreground">
-                              {formatCurrencyDH(r.plafondAnnuel)}
-                            </td>
-                            <td className="h-14 px-4 text-right text-muted-foreground">
-                              {formatCurrencyDH(r.encaissement)}
-                            </td>
-                            <td className="h-14 px-4 text-right text-muted-foreground">
-                              {formatCurrencyDH(r.maxFacture)}
-                            </td>
-                            <td
-                                className="h-14 px-4 text-right font-semibold"
-                                style={{
-                                  color: r.totalDepensesValidees > 0 ? "#059669" : "#ccc",
-                                }}
-                            >
-                              {formatCurrencyDH(r.totalDepensesValidees)}
-                            </td>
-                          </tr>
+                              <td className="h-14 px-4 text-center">
+                                <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleRubrique(r.code)}
+                                    disabled={r.transactions.length === 0}
+                                    className="h-4 w-4 cursor-pointer accent-[#1A3A8A]"
+                                />
+                              </td>
+                              <td className="h-14 px-4 text-center">
+                                {r.transactions.length > 0 && (
+                                    <button
+                                        onClick={() => toggleExpandRubrique(r.code)}
+                                        className="rounded p-1 hover:bg-muted"
+                                    >
+                                      {isExpanded ? "▼" : "▶"}
+                                    </button>
+                                )}
+                              </td>
+                              <td
+                                  className={`h-14 px-4 font-mono font-semibold ${isSelected ? "text-[#1A3A8A]" : "text-foreground"}`}
+                              >
+                                {r.code}
+                              </td>
+                              <td
+                                  className={`h-14 px-4 ${isSelected ? "font-semibold text-[#1A3A8A]" : "text-foreground"}`}
+                              >
+                                {r.libelle}
+                              </td>
+                              <td className="h-14 px-4 text-right text-muted-foreground">
+                                {selectedTxCount} / {r.transactions.length}
+                              </td>
+                              <td
+                                  className="h-14 px-4 text-right font-semibold"
+                                  style={{
+                                    color: selectedTotal > 0 ? "#059669" : "#ccc",
+                                  }}
+                              >
+                                {formatCurrencyDH(selectedTotal)}
+                              </td>
+                            </tr>
+                            {/* Expanded transactions */}
+                            {isExpanded && r.transactions.map((tx) => (
+                                <tr key={tx.id} className="bg-muted/30 border-b border-border/30">
+                                  <td className="h-10 px-4 text-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedTransactions.has(tx.id)}
+                                        onChange={() => toggleTransaction(tx.id, r.code)}
+                                        className="h-3.5 w-3.5 cursor-pointer accent-[#1A3A8A]"
+                                    />
+                                  </td>
+                                  <td className="h-10 px-4" />
+                                  <td colSpan={2} className="h-10 px-4 text-xs text-muted-foreground">
+                                    <span className="font-medium">{tx.fournisseur || "N/A"}</span>
+                                    {tx.factureNumero && <span className="ml-2">- Fact. {tx.factureNumero}</span>}
+                                    {tx.factureDate && <span className="ml-2">du {formatDateFR(tx.factureDate)}</span>}
+                                  </td>
+                                  <td className="h-10 px-4 text-right text-xs text-muted-foreground">
+                                    {tx.provinceName}
+                                  </td>
+                                  <td className="h-10 px-4 text-right text-xs font-medium text-[#059669]">
+                                    {formatCurrencyDH(tx.montantValide || 0)}
+                                  </td>
+                                </tr>
+                            ))}
+                          </React.Fragment>
                       );
                     })}
-                    {/* Total row - sum of all validated expenses */}
+                    {/* Total row */}
                     <tr className="bg-secondary/50 font-semibold">
-                      <td colSpan={6} className="h-14 px-4 text-right text-sm font-bold text-[#0A1A44]">
-                        TOTAL DEPENSES VALIDEES :
+                      <td colSpan={5} className="h-14 px-4 text-right text-sm font-bold text-[#0A1A44]">
+                        TOTAL SELECTIONNE :
                       </td>
                       <td className="h-14 px-4 text-right text-sm font-bold text-[#059669]">
-                        {formatCurrencyDH(
-                            rubriqueTotals.reduce((sum, rubrique) => sum + rubrique.totalDepensesValidees, 0)
-                        )}
+                        {formatCurrencyDH(totalDebiter)}
                       </td>
                     </tr>
                     </tbody>

@@ -208,8 +208,8 @@ export const transactionsApi = {
       apiRequest<TransactionRegie>(`/transactions/${id}/confirm?montantValide=${montantValide}`, {
         method: "POST",
       }),
-  reject: (id: number) =>
-      apiRequest<TransactionRegie>(`/transactions/${id}/reject`, { method: "POST" }),
+  reject: (id: number, motif?: string) =>
+      apiRequest<TransactionRegie>(`/transactions/${id}/reject${motif ? `?motif=${encodeURIComponent(motif)}` : ""}`, { method: "POST" }),
 };
 
 // ========================

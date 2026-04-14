@@ -120,6 +120,10 @@ export default function DashboardPage() {
     dateAp: "",
   });
 
+  // Reject modal state
+  const [rejectModal, setRejectModal] = useState<TransactionRegie | null>(null);
+  const [rejectMotif, setRejectMotif] = useState("");
+
   const [alimenterForm, setAlimenterForm] = useState({
     montant: "",
     op: "",
@@ -359,9 +363,18 @@ export default function DashboardPage() {
     const disponibleAvantDepense = plafond
         ? plafond.plafondEncaissement + tx.montant
         : 0;
+
+    // Calculate disponible annuel = budgetAnnuelInitial (fixe) - total depenses sauf la depense actuelle
+    const totalDepensesSaufActuelle = transactions
+        .filter(t => t.compteCode === tx.compteCode && t.id !== tx.id && (t.statut === "CONFIRMEE" || t.statut === "EN_ATTENTE"))
+        .reduce((sum, t) => sum + (t.statut === "CONFIRMEE" ? (t.montantValide || 0) : t.montant), 0);
+    const budgetInitial = plafond?.budgetAnnuelInitial || plafond?.plafondAnnuel || 0;
+    const disponibleAnnuel = budgetInitial - totalDepensesSaufActuelle;
+
     await generateAutorisationPDF({
       numeroAp: tx.numeroAp || String(tx.id),
       disponible: disponibleAvantDepense,
+      disponibleAnnuel,
       compteCode: tx.compteCode,
       libelle: plafond?.libelle || "",
       fournisseur: tx.fournisseur || "",
@@ -454,14 +467,25 @@ export default function DashboardPage() {
     }
   };
 
+  // Open reject modal
+  const openRejectModal = (tx: TransactionRegie) => {
+    setRejectModal(tx);
+    setRejectMotif("");
+  };
+
   // Reject transaction handler
-  const handleRejectTransaction = async (id: number) => {
-    if (!confirm("Etes-vous sur de vouloir rejeter cette transaction?")) return;
+  const handleRejectTransaction = async () => {
+    if (!rejectModal) return;
+    if (!rejectMotif.trim()) {
+      setError("Veuillez saisir le motif de rejet.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
-      await transactionsApi.reject(id);
+      await transactionsApi.reject(rejectModal.id, rejectMotif);
       setSuccess("Transaction rejetee.");
+      setRejectModal(null);
       await fetchPlafonds(); // Refresh data
     } catch (err) {
       setError(
@@ -1053,7 +1077,7 @@ export default function DashboardPage() {
                                             variant="ghost"
                                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                                             title="Rejeter"
-                                            onClick={() => handleRejectTransaction(tx.id)}
+                                            onClick={() => openRejectModal(tx)}
                                         >
                                           <X className="h-4 w-4" />
                                         </Button>
@@ -1491,6 +1515,74 @@ export default function DashboardPage() {
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
                       Enregistrer
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+        )}
+
+        {/* Reject Transaction Modal */}
+        {rejectModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div className="mb-6 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600">
+                      <X className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-bold text-[#0A1A44]">
+                      Rejeter la Transaction
+                    </h3>
+                  </div>
+                  <button
+                      onClick={() => setRejectModal(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Transaction Info */}
+                  <div className="rounded-lg bg-muted/50 p-4 text-sm">
+                    <p><strong>Fournisseur:</strong> {rejectModal.fournisseur || "N/A"}</p>
+                    <p><strong>Montant:</strong> {rejectModal.montant.toLocaleString("fr-FR")} DH</p>
+                    <p><strong>Facture:</strong> {rejectModal.factureNumero || "N/A"}</p>
+                  </div>
+
+                  {/* Motif de rejet */}
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                      Motif de Rejet <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        value={rejectMotif}
+                        onChange={(e) => setRejectMotif(e.target.value)}
+                        className="w-full rounded-lg border border-input bg-background p-3 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/10"
+                        rows={3}
+                        placeholder="Saisir le motif de rejet..."
+                    />
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                        onClick={() => setRejectModal(null)}
+                        variant="outline"
+                        className="flex-1 h-11"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                        onClick={handleRejectTransaction}
+                        disabled={submitting || !rejectMotif.trim()}
+                        className="flex-1 h-11 bg-red-600 text-white hover:bg-red-700"
+                    >
+                      {submitting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Rejeter
                     </Button>
                   </div>
                 </div>

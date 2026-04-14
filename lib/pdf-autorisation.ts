@@ -127,6 +127,7 @@ function formatCurrency(value: number): string {
 export interface AutorisationPaiementData {
     numeroAp: string;
     disponible: number;
+    disponibleAnnuel: number; // Plafond annuel - total depenses sauf la depense actuelle
     compteCode: string;
     libelle: string;
     fournisseur: string;
@@ -220,11 +221,11 @@ export async function generateAutorisationPDF(data: AutorisationPaiementData) {
     let y = subtitleY + 18;
     const lineHeight = 8;
 
-    // Available credits
+    // Available credits with disponible annuel
     doc.setFont("helvetica", "normal");
     doc.text(`Sur les credits disponibles de `, marginLeft, y);
     doc.setFont("helvetica", "bold");
-    doc.text(`${formatCurrency(data.disponible)} DH`, marginLeft + doc.getTextWidth("Sur les credits disponibles de "), y);
+    doc.text(`${formatCurrency(data.disponibleAnnuel)} DH`, marginLeft + doc.getTextWidth("Sur les credits disponibles de "), y);
 
     y += lineHeight;
 
@@ -290,7 +291,7 @@ export async function generateAutorisationPDF(data: AutorisationPaiementData) {
     doc.setFont("helvetica", "normal");
     doc.text("(en lettres)", pageWidth - marginRight, y, { align: "right" });
 
-    // Footer - Location and date
+    // Footer - Location and date (using factureDate)
     y = 220;
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
@@ -299,7 +300,7 @@ export async function generateAutorisationPDF(data: AutorisationPaiementData) {
     doc.setDrawColor(150, 150, 150);
     doc.line(marginLeft, y - 15, pageWidth - marginRight, y - 15);
 
-    doc.text(`A ${data.provinceName.toUpperCase()}, le ${now.toLocaleDateString("fr-FR")}`, pageWidth / 2, y, { align: "center" });
+    doc.text(`A ${data.provinceName.toUpperCase()}, le ${data.factureDate}`, pageWidth / 2, y, { align: "center" });
 
     // Signature area
     y += 20;
