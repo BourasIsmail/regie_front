@@ -177,26 +177,39 @@ export default function OrdreImputationPage() {
       });
 
       // Build rubriques with totals and transactions list
-      // Only include rubriques that have transactions in the selected period
-      const results: RubriqueTotal[] = plafonds
-          .map((p: PlafondRegie) => {
-            const rubriqueTransactions = confirmedTransactions
-                .filter((tx: TransactionRegie) => tx.compteCode === p.compteCode);
+      // Group by compteCode to avoid duplicates when multiple provinces have same rubrique
+      const rubriqueMap = new Map<string, RubriqueTotal>();
 
-            const totalDepenses = rubriqueTransactions
-                .reduce((sum: number, tx: TransactionRegie) => sum + (tx.montantValide || 0), 0);
+      for (const p of plafonds) {
+        if (rubriqueMap.has(p.compteCode)) continue; // Skip if already processed
 
-            return {
-              code: p.compteCode,
-              libelle: p.libelle,
-              plafondAnnuel: p.plafondAnnuel,
-              encaissement: p.plafondEncaissement,
-              maxFacture: p.plafondMaxFacture,
-              totalDepensesValidees: totalDepenses,
-              transactions: rubriqueTransactions,
-            };
-          })
-          .filter((r) => r.transactions.length > 0); // Only show rubriques with transactions in period
+        // Get unique transactions for this compteCode (avoid duplicates by transaction id)
+        const rubriqueTransactions = confirmedTransactions
+            .filter((tx: TransactionRegie) => tx.compteCode === p.compteCode);
+
+        // Deduplicate transactions by id
+        const uniqueTransactions = rubriqueTransactions.filter(
+            (tx: TransactionRegie, index: number, self: TransactionRegie[]) =>
+                index === self.findIndex((t) => t.id === tx.id)
+        );
+
+        const totalDepenses = uniqueTransactions
+            .reduce((sum: number, tx: TransactionRegie) => sum + (tx.montantValide || 0), 0);
+
+        if (uniqueTransactions.length > 0) {
+          rubriqueMap.set(p.compteCode, {
+            code: p.compteCode,
+            libelle: p.libelle,
+            plafondAnnuel: p.plafondAnnuel,
+            encaissement: p.plafondEncaissement,
+            maxFacture: p.plafondMaxFacture,
+            totalDepensesValidees: totalDepenses,
+            transactions: uniqueTransactions,
+          });
+        }
+      }
+
+      const results: RubriqueTotal[] = Array.from(rubriqueMap.values());
 
       setRubriqueTotals(results);
 
