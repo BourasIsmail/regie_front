@@ -37,7 +37,7 @@ export default function DashboardLayout({
     return (
         <div className="flex min-h-screen flex-col bg-background">
             <DashboardTopbar />
-            <main className="mx-auto mt-[70px] max-w-[1600px] flex-1 animate-in fade-in slide-in-from-bottom-5 p-8 duration-400">
+            <main className="mx-auto mt-[70px] w-full max-w-[1600px] flex-1 animate-in fade-in slide-in-from-bottom-5 p-8 duration-400">
                 {children}
             </main>
             <footer className="border-t border-border bg-muted/30 py-4 text-center">

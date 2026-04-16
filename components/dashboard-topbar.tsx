@@ -84,7 +84,7 @@ export function DashboardTopbar() {
               Gestion des Regies
             </span>
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Cour des Comptes
+              Entraide Nationale
             </span>
             </div>
           </div>
