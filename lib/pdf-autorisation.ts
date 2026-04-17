@@ -127,7 +127,7 @@ function formatCurrency(value: number): string {
 export interface AutorisationPaiementData {
     numeroAp: string;
     disponible: number;
-    disponibleAnnuel: number; // Plafond annuel - total depenses sauf la depense actuelle
+    disponibleAnnuel: number; // Disponible rubrique - credits disponibles avant cette depense
     compteCode: string;
     libelle: string;
     fournisseur: string;
@@ -170,14 +170,6 @@ export async function generateAutorisationPDF(data: AutorisationPaiementData) {
     const pageWidth = doc.internal.pageSize.getWidth();
     const marginLeft = 20;
     const marginRight = 20;
-
-    // Header with date/time
-    const now = new Date();
-    const dateTimeStr = now.toLocaleDateString("fr-FR") + " " + now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(dateTimeStr, marginLeft, 15);
-    doc.text("Tableau de Bord | Gestion Regie - Cour des Comptes", pageWidth / 2, 15, { align: "center" });
 
     // Try to load and add the logo image
     try {
@@ -259,13 +251,12 @@ export async function generateAutorisationPDF(data: AutorisationPaiementData) {
     // Amount in numbers
     doc.text("la somme de ", marginLeft, y);
     doc.setFont("helvetica", "bold");
-    doc.text(`${formatCurrency(data.montant)}`, marginLeft + doc.getTextWidth("la somme de "), y);
-    doc.setFont("helvetica", "normal");
-    doc.text("          (en chiffres).", marginLeft + doc.getTextWidth("la somme de " + formatCurrency(data.montant)), y);
+    doc.text(`${formatCurrency(data.montant)} DIRHAMS`, marginLeft + doc.getTextWidth("la somme de "), y);
 
     y += lineHeight;
 
     // Invoice reference
+    doc.setFont("helvetica", "normal");
     doc.text("En reglement de facture N° ", marginLeft, y);
     doc.setFont("helvetica", "bold");
     doc.text(data.factureNumero, marginLeft + doc.getTextWidth("En reglement de facture N° "), y);
@@ -280,16 +271,19 @@ export async function generateAutorisationPDF(data: AutorisationPaiementData) {
 
     y += lineHeight * 1.5;
 
-    // Amount in words
+    // Amount in words with centimes and DIRHAMS
+    const wholePart = Math.floor(data.montant);
+    const centimes = Math.round((data.montant - wholePart) * 100);
+    let amountWords = numberToFrenchWords(wholePart);
+    if (centimes > 0) {
+        amountWords += " VIRGULE " + numberToFrenchWords(centimes);
+    }
+    amountWords += " DIRHAMS";
+
     doc.text("Arretee la somme a", marginLeft, y);
     y += lineHeight;
     doc.setFont("helvetica", "bold");
-    const amountWords = numberToFrenchWords(Math.floor(data.montant));
     doc.text(amountWords, marginLeft, y);
-
-    // "(en lettres)" on the right side of the same line
-    doc.setFont("helvetica", "normal");
-    doc.text("(en lettres)", pageWidth - marginRight, y, { align: "right" });
 
     // Footer - Location and date (using factureDate)
     y = 220;

@@ -23,6 +23,7 @@ interface RubriqueTotal {
   encaissement: number;
   maxFacture: number;
   totalDepensesValidees: number;
+  depensesOriginales?: number; // Original expenses before limiting by available
   transactions: TransactionRegie[]; // List of transactions for this rubrique
 }
 
@@ -291,16 +292,24 @@ export default function OrdreImputationPage() {
   // Calculate selected items based on selected transactions
   const selectedItems = rubriqueTotals
       .filter((r) => selectedRubriques.has(r.code))
-      .map((r) => ({
-        ...r,
-        transactions: r.transactions.filter(tx => selectedTransactions.has(tx.id)),
-        totalDepensesValidees: r.transactions
+      .map((r) => {
+        const depensesSelectionnees = r.transactions
             .filter(tx => selectedTransactions.has(tx.id))
-            .reduce((sum, tx) => sum + (tx.montantValide || 0), 0),
-      }))
+            .reduce((sum, tx) => sum + (tx.montantValide || 0), 0);
+        return {
+          ...r,
+          transactions: r.transactions.filter(tx => selectedTransactions.has(tx.id)),
+          totalDepensesValidees: depensesSelectionnees, // Total reel des depenses selectionnees
+        };
+      })
       .filter((r) => r.totalDepensesValidees > 0);
 
+  // Total a debiter = somme des depenses reelles selectionnees
   const totalDebiter = selectedItems.reduce((s, r) => s + r.totalDepensesValidees, 0);
+
+  // Montant a alimenter = somme de min(plafondAnnuel, totalDepensesValidees) pour chaque rubrique
+  // Si la rubrique n'a pas assez de disponible, on ne prend que le montant disponible
+  const montantAAlimenter = selectedItems.reduce((s, r) => s + Math.min(r.plafondAnnuel, r.totalDepensesValidees), 0);
 
   const handlePrint = () => {
     setShowPrint(true);
@@ -338,13 +347,47 @@ export default function OrdreImputationPage() {
           <style>{`
           @page {
             size: A4 landscape;
-            margin: 10mm;
+            margin: 0;
           }
           @media print {
-            body { background: white; padding: 0; margin: 0; }
+            * {
+              margin: 0 !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+            }
+            html, body { 
+              background: white !important; 
+              width: 297mm !important;
+              height: 210mm !important;
+              overflow: hidden !important;
+            }
             .print-btn-container { display: none !important; }
-            .page { box-shadow: none; margin: 0; padding: 10mm; width: 100%; height: auto; min-height: auto; }
-            nav, header, .dashboard-nav, [class*="navbar"], [class*="header"] { display: none !important; }
+            .page { 
+              box-shadow: none !important; 
+              margin: 0 !important; 
+              padding: 5mm !important; 
+              width: 297mm !important; 
+              height: 210mm !important; 
+              min-height: unset !important;
+              max-height: 210mm !important;
+              page-break-after: avoid !important;
+              page-break-inside: avoid !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+            }
+            nav, header, footer, .dashboard-nav, [class*="navbar"], [class*="header"], [class*="topbar"] { 
+              display: none !important; 
+              height: 0 !important;
+              width: 0 !important;
+              overflow: hidden !important;
+            }
+          }
+          @media print {
+            html {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
           }
         `}</style>
 
@@ -370,14 +413,15 @@ export default function OrdreImputationPage() {
               ref={printRef}
               className="page mx-auto bg-white shadow-lg"
               style={{
-                width: "297mm",
-                minHeight: "210mm",
-                padding: "15mm",
+                width: "287mm",
+                height: "200mm",
+                padding: "8mm",
                 fontFamily: '"Times New Roman", Times, serif',
+                overflow: "hidden",
               }}
           >
             {/* Outer Border */}
-            <div style={{ border: "2px solid #000", width: "100%", height: "100%", padding: 0 }}>
+            <div style={{ border: "2px solid #000", width: "100%", height: "100%", padding: 0, display: "flex", flexDirection: "column" }}>
 
               {/* Title Row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", borderBottom: "2px solid #000" }}>
@@ -418,10 +462,9 @@ export default function OrdreImputationPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", borderBottom: "1px solid #000" }}>
                 <div style={{ borderRight: "2px solid #000", padding: "8px 10px" }}>
                   <div style={{ fontSize: "12px", marginBottom: "4px" }}>Suivant pieces justificatives :</div>
-                  <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "2px" }}>Voir pieces ci jointes</div>
-                  <div style={{ fontSize: "12px", marginBottom: "12px" }}>Periode: {new Date(periodeDebut).toLocaleDateString("fr-FR")} - {new Date(periodeFin).toLocaleDateString("fr-FR")}</div>
+                  <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "12px" }}>Voir pieces ci jointes</div>
                   <div style={{ fontSize: "14px", fontWeight: "bold", marginTop: "6px" }}>
-                    {"Montant a alimenter : " + formatMontant(totalDebiter) + " dhs"}
+                    {"Montant a alimenter : " + formatMontant(montantAAlimenter) + " dhs"}
                   </div>
                 </div>
                 <div style={{ padding: "6px 10px" }}>
@@ -431,37 +474,36 @@ export default function OrdreImputationPage() {
                   {["Chapitre", "Article", "Paragraphe", "Credit disponible", "Visa :"].map((item) => (
                       <div key={item} style={{ fontSize: "11.5px", padding: "1.5px 0", display: "flex", justifyContent: "space-between" }}>
                         <span>{item}</span>
-                        {item === "Visa :" && <span style={{ fontSize: "16px" }}>$</span>}
                       </div>
                   ))}
                 </div>
               </div>
 
               {/* Accounts Table */}
-              <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px solid #000" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px solid #000", flex: 1 }}>
                 <thead>
                 <tr>
-                  <th colSpan={2} style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center", fontWeight: "bold", width: "140px" }}>
+                  <th colSpan={2} style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "15px", textAlign: "center", fontWeight: "bold", width: "200px" }}>
                     {"N° Compte"}
                   </th>
-                  <th rowSpan={2} style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center", fontWeight: "bold" }}>
+                  <th rowSpan={2} style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "15px", textAlign: "center", fontWeight: "bold" }}>
                     INTITULE
                   </th>
-                  <th colSpan={2} style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center", fontWeight: "bold", width: "220px" }}>
+                  <th colSpan={2} style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "15px", textAlign: "center", fontWeight: "bold", width: "300px" }}>
                     MONTANT
                   </th>
                 </tr>
                 <tr>
-                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "center", width: "70px" }}>
+                  <th style={{ border: "1px solid #000", padding: "8px 12px", fontSize: "14px", textAlign: "center", width: "100px" }}>
                     {"a Debiter"}
                   </th>
-                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "center", width: "70px" }}>
+                  <th style={{ border: "1px solid #000", padding: "8px 12px", fontSize: "14px", textAlign: "center", width: "100px" }}>
                     {"a Crediter"}
                   </th>
-                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "right", width: "110px" }}>
+                  <th style={{ border: "1px solid #000", padding: "8px 12px", fontSize: "14px", textAlign: "right", width: "150px" }}>
                     {"a Debiter"}
                   </th>
-                  <th style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "11px", textAlign: "right", width: "110px" }}>
+                  <th style={{ border: "1px solid #000", padding: "8px 12px", fontSize: "14px", textAlign: "right", width: "150px" }}>
                     {"a Crediter"}
                   </th>
                 </tr>
@@ -469,64 +511,64 @@ export default function OrdreImputationPage() {
                 <tbody>
                 {selectedItems.map((item, idx) => (
                     <tr key={`${item.code}-${idx}`}>
-                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }}>
+                      <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "center" }}>
                         {item.code}
                       </td>
-                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }} />
-                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "left" }}>
+                      <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "center" }} />
+                      <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "left" }}>
                         {item.libelle}
                       </td>
-                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }}>
+                      <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }}>
                         {formatMontant(item.totalDepensesValidees)}
                       </td>
-                      <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }} />
+                      <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }} />
                     </tr>
                 ))}
                 {/* Regie credit row */}
                 <tr>
-                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }} />
-                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "center" }}>
+                  <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "center" }} />
+                  <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "center" }}>
                     5165-130
                   </td>
-                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "left" }}>
+                  <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "left" }}>
                     {"Regie " + regionName}
                   </td>
-                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }} />
-                  <td style={{ border: "1px solid #000", padding: "4px 6px", fontSize: "12px", textAlign: "right" }}>
+                  <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }} />
+                  <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }}>
                     {formatMontant(totalDebiter)}
                   </td>
                 </tr>
-                {/* Empty filler rows */}
-                {Array.from({ length: 3 }).map((_, i) => (
-                    <tr key={`empty-${i}`} style={{ height: "22px" }}>
-                      <td style={{ border: "1px solid #000" }} />
-                      <td style={{ border: "1px solid #000" }} />
-                      <td style={{ border: "1px solid #000" }} />
-                      <td style={{ border: "1px solid #000" }} />
-                      <td style={{ border: "1px solid #000" }} />
-                    </tr>
-                ))}
+                {/* Totals row */}
+                <tr style={{ backgroundColor: "#e8e8e8", fontWeight: "bold" }}>
+                  <td colSpan={3} style={{ border: "2px solid #000", padding: "10px 12px", fontSize: "15px", textAlign: "center", fontWeight: "bold" }}>
+                    TOTAUX
+                  </td>
+                  <td style={{ border: "2px solid #000", padding: "10px 12px", fontSize: "15px", textAlign: "right", fontWeight: "bold" }}>
+                    {formatMontant(totalDebiter)}
+                  </td>
+                  <td style={{ border: "2px solid #000", padding: "10px 12px", fontSize: "15px", textAlign: "right", fontWeight: "bold" }}>
+                    {formatMontant(totalDebiter)}
+                  </td>
+                </tr>
                 </tbody>
               </table>
 
               {/* Signature Row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderTop: "2px solid #000" }}>
                 <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>Chef de Service</div>
+                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Chef de Service</div>
                 </div>
                 <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>Chef de division</div>
-                </div>
-                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "left", minHeight: "70px" }}>
-                  <div style={{ fontSize: "11px" }}>Journal................................</div>
-                  <div style={{ fontSize: "11px", marginTop: "4px" }}>{"N° Ecriture..........................."}</div>
-                  <div style={{ fontSize: "11px", marginTop: "4px" }}>Date.........................................</div>
+                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Chef de division</div>
                 </div>
                 <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>Le Tresorier Payeur</div>
+                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Service Comptable</div>
+                </div>
+                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
+                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Le Tresorier Payeur</div>
                 </div>
                 <div style={{ padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>
+                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>
                     {regionName.toLowerCase().includes("siege") || regionName.toLowerCase().includes("siège") ? "L'Ordonnateur" : "Le Sous-Ordonnateur"}
                   </div>
                 </div>

@@ -413,7 +413,7 @@ export default function PlafondsPage() {
                       Plafond Annuel
                     </th>
                     <th className="h-12 border-b border-border px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Budget Initial
+                      Disponible Rubrique
                     </th>
                     <th className="h-12 border-b border-border px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Encaissement
@@ -442,10 +442,10 @@ export default function PlafondsPage() {
                         </td>
                         <td className="h-14 px-4 text-foreground">{p.libelle}</td>
                         <td className="h-14 px-4 text-right font-semibold text-foreground">
-                          {formatCurrency(p.plafondAnnuel)}
+                          {formatCurrency(p.budgetAnnuelInitial || 0)}
                         </td>
                         <td className="h-14 px-4 text-right font-semibold text-[#1A3A8A]">
-                          {formatCurrency(p.budgetAnnuelInitial || 0)}
+                          {formatCurrency(p.plafondAnnuel)}
                         </td>
                         <td className="h-14 px-4 text-right font-semibold text-foreground">
                           {formatCurrency(p.plafondEncaissement)}
@@ -539,6 +539,23 @@ export default function PlafondsPage() {
                       type="number"
                       step="0.01"
                       min="0"
+                      value={form.budgetAnnuelInitial}
+                      onChange={(e) =>
+                          setForm({ ...form, budgetAnnuelInitial: Number(e.target.value) })
+                      }
+                      placeholder="0.00"
+                      required
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                  Budget fixe de reference (ne change pas avec les alimentations)
+                </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-semibold">Disponible Rubrique (DH)</Label>
+                  <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
                       value={form.plafondAnnuel}
                       onChange={(e) =>
                           setForm({ ...form, plafondAnnuel: Number(e.target.value) })
@@ -547,23 +564,7 @@ export default function PlafondsPage() {
                       required
                   />
                   <span className="text-[10px] text-muted-foreground">
-                  Budget annuel maximum pour cette rubrique
-                </span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label className="text-xs font-semibold">Budget Annuel Initial (DH)</Label>
-                  <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.budgetAnnuelInitial}
-                      onChange={(e) =>
-                          setForm({ ...form, budgetAnnuelInitial: Number(e.target.value) })
-                      }
-                      placeholder="0.00"
-                  />
-                  <span className="text-[10px] text-muted-foreground">
-                  Budget fixe de reference (ne change pas avec les alimentations)
+                  Montant disponible pour cette rubrique
                 </span>
                 </div>
                 <div className="flex flex-col gap-2">

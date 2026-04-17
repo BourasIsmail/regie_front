@@ -43,6 +43,7 @@ export interface TransactionRegie {
   validatedBy: string | null;
   validatedAt: string | null;
   motifRejet: string | null;
+  disponibleAnnuelSnapshot: number | null;
   fournisseur: string | null;
   adresseFournisseur: string | null;
   factureNumero: string | null;
