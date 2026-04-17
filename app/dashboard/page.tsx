@@ -358,30 +358,23 @@ export default function DashboardPage() {
     // Print autorisation PDF for a transaction
     const handlePrintAutorisation = async (tx: TransactionRegie) => {
         const plafond = plafonds.find((p) => p.compteCode === tx.compteCode);
-        // Calculate credit disponible BEFORE this transaction was deducted
-        // Current encaissement + this transaction's montant = balance before this expense
-        const disponibleAvantDepense = plafond
-            ? plafond.plafondEncaissement + tx.montant
-            : 0;
 
-        // Use stored disponibleAnnuelSnapshot if available (for confirmed transactions)
-        // Otherwise calculate it dynamically (for pending transactions)
-        let disponibleAnnuel: number;
+        // Calculate disponible rubrique BEFORE this transaction was deducted
+        // Use stored snapshot if available (for confirmed transactions)
+        let disponibleRubrique: number;
         if (tx.disponibleAnnuelSnapshot !== null && tx.disponibleAnnuelSnapshot !== undefined) {
-            disponibleAnnuel = tx.disponibleAnnuelSnapshot;
+            // For confirmed transactions, use the stored snapshot
+            disponibleRubrique = tx.disponibleAnnuelSnapshot;
         } else {
-            // Fallback: calculate dynamically for non-confirmed transactions
-            const totalDepensesSaufActuelle = transactions
-                .filter(t => t.compteCode === tx.compteCode && t.id !== tx.id && (t.statut === "CONFIRMEE" || t.statut === "EN_ATTENTE"))
-                .reduce((sum, t) => sum + (t.statut === "CONFIRMEE" ? (t.montantValide || 0) : t.montant), 0);
-            const budgetInitial = plafond?.budgetAnnuelInitial || plafond?.plafondAnnuel || 0;
-            disponibleAnnuel = budgetInitial - totalDepensesSaufActuelle;
+            // For pending transactions, calculate: current disponible + this transaction's montant
+            // plafondAnnuel = disponible rubrique actuel
+            disponibleRubrique = plafond ? plafond.plafondAnnuel + tx.montant : 0;
         }
 
         await generateAutorisationPDF({
             numeroAp: tx.numeroAp || String(tx.id),
-            disponible: disponibleAvantDepense,
-            disponibleAnnuel,
+            disponible: disponibleRubrique,
+            disponibleAnnuel: disponibleRubrique,
             compteCode: tx.compteCode,
             libelle: plafond?.libelle || "",
             fournisseur: tx.fournisseur || "",

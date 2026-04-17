@@ -271,14 +271,13 @@ export async function generateAutorisationPDF(data: AutorisationPaiementData) {
 
     y += lineHeight * 1.5;
 
-    // Amount in words with centimes and DIRHAMS
+    // Amount in words: "X DIRHAMS Y CENTIMES"
     const wholePart = Math.floor(data.montant);
     const centimes = Math.round((data.montant - wholePart) * 100);
-    let amountWords = numberToFrenchWords(wholePart);
+    let amountWords = numberToFrenchWords(wholePart) + " DIRHAMS";
     if (centimes > 0) {
-        amountWords += " VIRGULE " + numberToFrenchWords(centimes);
+        amountWords += " " + numberToFrenchWords(centimes) + " CENTIMES";
     }
-    amountWords += " DIRHAMS";
 
     doc.text("Arretee la somme a", marginLeft, y);
     y += lineHeight;
