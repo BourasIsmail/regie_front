@@ -366,9 +366,13 @@ export default function DashboardPage() {
             // For confirmed transactions, use the stored snapshot
             disponibleRubrique = tx.disponibleAnnuelSnapshot;
         } else {
-            // For pending transactions, calculate: current disponible + this transaction's montant
-            // plafondAnnuel = disponible rubrique actuel
-            disponibleRubrique = plafond ? plafond.plafondAnnuel + tx.montant : 0;
+            // For pending/confirmed transactions without snapshot:
+            // Calculate: budgetAnnuelInitial - total confirmed transactions (excluding this one)
+            const budgetInitial = plafond?.budgetAnnuelInitial || plafond?.plafondAnnuel || 0;
+            const totalDepensesConfirmees = transactions
+                .filter(t => t.compteCode === tx.compteCode && t.id !== tx.id && t.statut === "CONFIRMEE")
+                .reduce((sum, t) => sum + (t.montantValide || t.montant), 0);
+            disponibleRubrique = budgetInitial - totalDepensesConfirmees;
         }
 
         await generateAutorisationPDF({
