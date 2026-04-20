@@ -359,26 +359,21 @@ export default function DashboardPage() {
     const handlePrintAutorisation = async (tx: TransactionRegie) => {
         const plafond = plafonds.find((p) => p.compteCode === tx.compteCode);
 
-        console.log("[v0] Transaction:", tx.id, "disponibleAnnuelSnapshot:", tx.disponibleAnnuelSnapshot, "statut:", tx.statut);
-
-        // Calculate disponible rubrique BEFORE this transaction was deducted
-        // Use stored snapshot if available (for confirmed transactions)
+        // Use the stored snapshot (set at creation time)
+        // Snapshot = budgetAnnuelInitial - total confirmed/pending transactions BEFORE this one
         let disponibleRubrique: number;
         if (tx.disponibleAnnuelSnapshot !== null && tx.disponibleAnnuelSnapshot !== undefined) {
-            // For confirmed transactions, use the stored snapshot
             disponibleRubrique = tx.disponibleAnnuelSnapshot;
         } else {
-            // For transactions without snapshot:
-            // Calculate: budgetAnnuelInitial - transactions confirmed BEFORE this one
+            // Fallback for old transactions without snapshot
             const budgetInitial = plafond?.budgetAnnuelInitial || plafond?.plafondAnnuel || 0;
-            const txValidatedAt = tx.validatedAt ? new Date(tx.validatedAt).getTime() : Date.now();
+            const txCreatedAt = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
             const totalDepensesAvant = transactions
                 .filter(t => {
                     if (t.compteCode !== tx.compteCode || t.id === tx.id) return false;
-                    if (t.statut !== "CONFIRMEE") return false;
-                    // Only include transactions confirmed BEFORE this one
-                    const tValidatedAt = t.validatedAt ? new Date(t.validatedAt).getTime() : 0;
-                    return tValidatedAt < txValidatedAt;
+                    if (t.statut === "REJETEE") return false;
+                    const tCreatedAt = t.createdAt ? new Date(t.createdAt).getTime() : 0;
+                    return tCreatedAt < txCreatedAt;
                 })
                 .reduce((sum, t) => sum + (t.montantValide || t.montant), 0);
             disponibleRubrique = budgetInitial - totalDepensesAvant;
