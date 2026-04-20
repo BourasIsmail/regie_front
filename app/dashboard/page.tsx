@@ -359,6 +359,8 @@ export default function DashboardPage() {
     const handlePrintAutorisation = async (tx: TransactionRegie) => {
         const plafond = plafonds.find((p) => p.compteCode === tx.compteCode);
 
+        console.log("[v0] Transaction:", tx.id, "disponibleAnnuelSnapshot:", tx.disponibleAnnuelSnapshot, "statut:", tx.statut);
+
         // Calculate disponible rubrique BEFORE this transaction was deducted
         // Use stored snapshot if available (for confirmed transactions)
         let disponibleRubrique: number;
@@ -366,13 +368,20 @@ export default function DashboardPage() {
             // For confirmed transactions, use the stored snapshot
             disponibleRubrique = tx.disponibleAnnuelSnapshot;
         } else {
-            // For pending/confirmed transactions without snapshot:
-            // Calculate: budgetAnnuelInitial - total confirmed transactions (excluding this one)
+            // For transactions without snapshot:
+            // Calculate: budgetAnnuelInitial - transactions confirmed BEFORE this one
             const budgetInitial = plafond?.budgetAnnuelInitial || plafond?.plafondAnnuel || 0;
-            const totalDepensesConfirmees = transactions
-                .filter(t => t.compteCode === tx.compteCode && t.id !== tx.id && t.statut === "CONFIRMEE")
+            const txValidatedAt = tx.validatedAt ? new Date(tx.validatedAt).getTime() : Date.now();
+            const totalDepensesAvant = transactions
+                .filter(t => {
+                    if (t.compteCode !== tx.compteCode || t.id === tx.id) return false;
+                    if (t.statut !== "CONFIRMEE") return false;
+                    // Only include transactions confirmed BEFORE this one
+                    const tValidatedAt = t.validatedAt ? new Date(t.validatedAt).getTime() : 0;
+                    return tValidatedAt < txValidatedAt;
+                })
                 .reduce((sum, t) => sum + (t.montantValide || t.montant), 0);
-            disponibleRubrique = budgetInitial - totalDepensesConfirmees;
+            disponibleRubrique = budgetInitial - totalDepensesAvant;
         }
 
         await generateAutorisationPDF({
