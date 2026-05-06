@@ -30,6 +30,107 @@ interface RubriqueTotal {
 // Region name for "Siege Central"
 const SIEGE_CENTRAL_NAME = "Siege central";
 
+// City codes mapping (province name -> code ville)
+const CITY_CODES: Record<string, string> = {
+  "AGADIR": "5165-65", "AGADIR-IDA-OU-TANANE": "5165-65",
+  "AL HOCEIMA": "5165-66",
+  "AOUSERD": "5165-176",
+  "ASSA ZAG": "5165-123",
+  "AZILAL": "5165-67",
+  "BENI MELLAL": "5165-68",
+  "BEN SLIMANE": "5165-69", "BENSLIMANE": "5165-69",
+  "BERCHID": "5165-181", "BERRECHID": "5165-181",
+  "BERKANE": "5165-154",
+  "BOUJDOUR": "5165-70",
+  "BOULEMANE": "5165-71",
+  "CASA AIN CHOK": "5165-72", "AIN CHOCK": "5165-72",
+  "CASA AIN SBEA": "5165-73", "AIN SEBAA": "5165-73",
+  "CASA ANFA": "5165-74", "ANFA": "5165-74",
+  "CASA BEN M'SIK": "5165-75", "BEN M'SIK": "5165-75",
+  "CASA EL FIDA": "5165-163", "EL FIDA": "5165-163",
+  "CASA HAY HASSANI": "5165-164", "HAY HASSANI": "5165-164",
+  "CASA MEDIOUNA": "5165-157", "MEDIOUNA": "5165-157",
+  "CASA MOULAY RCHID": "5165-161", "MOULAY RACHID": "5165-161",
+  "CASA NOUACER": "5165-165", "NOUACEUR": "5165-165",
+  "CASA SIDI BERNOUSSI": "5165-158", "SIDI BERNOUSSI": "5165-158",
+  "CHEFCHAOUEN": "5165-76",
+  "CHICHAOUA": "5165-77",
+  "CHTOUKA AIT BAHA": "5165-143", "CHTOUKA-AIT BAHA": "5165-143",
+  "DAKHLA": "5165-98", "OUED ED-DAHAB": "5165-98",
+  "DRIOUICH": "5165-173", "DRIOUCH": "5165-173",
+  "EL HAJEB": "5165-138",
+  "EL JADIDA": "5165-78",
+  "EL KELAA": "5165-79", "EL KELAA DES SRAGHNA": "5165-79",
+  "ERRACHIDIA": "5165-80",
+  "ESSAOUIRA": "5165-81",
+  "FES": "5165-64",
+  "FIGUIG": "5165-82",
+  "FKIH BEN SALEH": "5165-182",
+  "FNIDEQ": "5165-155", "M'DIQ-FNIDEQ": "5165-155",
+  "GUELMIM": "5165-83",
+  "GUERSIF": "5165-180", "GUERCIF": "5165-180",
+  "IFRANE": "5165-84",
+  "INEZGANE AIT MELLOUL": "5165-141", "INEZGANE-AIT MELLOUL": "5165-141",
+  "JERADA": "5165-131",
+  "KENITRA": "5165-85",
+  "KHEMISSET": "5165-63",
+  "KHENIFRA": "5165-86",
+  "KHOURIBGA": "5165-87",
+  "LAAYOUNE": "5165-88",
+  "LARACHE": "5165-89",
+  "MARRAKECH": "5165-92",
+  "EL HAOUZ": "5165-90",
+  "MIDELT": "5165-172",
+  "MEKNES": "5165-94",
+  "MOHAMMADIA": "5165-95",
+  "MY YAAKOUB": "5165-159", "MOULAY YACOUB": "5165-159",
+  "NADOR": "5165-96",
+  "OUARZAZATE": "5165-97",
+  "OUAZZANE": "5165-178",
+  "OUJDA": "5165-61", "OUJDA-ANGAD": "5165-61",
+  "RABAT": "5165-62",
+  "RHAMNA": "5165-174", "REHAMNA": "5165-174",
+  "SAFI": "5165-100",
+  "SALE": "5165-101",
+  "SEFROU": "5165-156",
+  "SETTAT": "5165-102",
+  "SIDI BENNOUR": "5165-177",
+  "SIDI IFNI": "5165-179",
+  "SIDI KACEM": "5165-103",
+  "SIDI SLIMANE": "5165-183",
+  "SMARA": "5165-104",
+  "TAN TAN": "5165-105", "TAN-TAN": "5165-105",
+  "TANGER ASILAH": "5165-106", "TANGER-ASSILAH": "5165-106",
+  "FAHS ANJRA": "5165-126", "FAHS-ANJRA": "5165-126",
+  "TAOUNATE": "5165-107",
+  "TAOURIRT": "5165-132",
+  "TARFAIA": "5165-184",
+  "TAROUDANT": "5165-108",
+  "TATA": "5165-109",
+  "TAZA": "5165-110",
+  "TEMARA": "5165-99", "SKHIRAT-TEMARA": "5165-99",
+  "TETOUEN": "5165-111", "TETOUAN": "5165-111",
+  "TINGHIR": "5165-175",
+  "TIZNIT": "5165-112",
+  "YOUSSOUFIA": "5165-186",
+  "ZAGORA": "5165-142",
+  "SIEGE CENTRAL": "5165-130", "SIEGE": "5165-130",
+};
+
+// Function to get city code from province name
+function getCityCode(provinceName: string): string {
+  const normalized = provinceName.toUpperCase().trim();
+  // Try exact match first
+  if (CITY_CODES[normalized]) return CITY_CODES[normalized];
+  // Try partial match
+  for (const [key, code] of Object.entries(CITY_CODES)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return code;
+    }
+  }
+  return "5165-000"; // Default fallback
+}
+
 function formatCurrencyDH(value: number) {
   return (
       new Intl.NumberFormat("fr-FR", {
@@ -341,6 +442,8 @@ export default function OrdreImputationPage() {
   // Print View - Exact format from provided JSX template
   if (showPrint) {
     const regionName = regions.find((r) => String(r.id) === selectedRegion)?.name || "";
+    const provinceName = provinces.find((p) => String(p.id) === selectedProvince)?.name || "";
+    const cityCode = getCityCode(provinceName);
 
     return (
         <>
@@ -454,7 +557,7 @@ export default function OrdreImputationPage() {
                   {"Nature de l'operation :"}
                 </div>
                 <div style={{ padding: "5px 10px", fontSize: "13px", fontWeight: "bold", letterSpacing: "1px" }}>
-                  {"REGIE " + regionName.toUpperCase()}
+                  {"REGIE " + provinceName.toUpperCase()}
                 </div>
               </div>
 
@@ -528,10 +631,10 @@ export default function OrdreImputationPage() {
                 <tr>
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "center" }} />
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "center" }}>
-                    5165-130
+                    {cityCode}
                   </td>
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "left" }}>
-                    {"Regie " + regionName}
+                    {"Regie " + provinceName}
                   </td>
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }} />
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }}>
@@ -569,7 +672,7 @@ export default function OrdreImputationPage() {
                 </div>
                 <div style={{ padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
                   <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>
-                    {regionName.toLowerCase().includes("siege") || regionName.toLowerCase().includes("siège") ? "L'Ordonnateur" : "Le Sous-Ordonnateur"}
+                    {provinceName.toLowerCase().includes("siege") || provinceName.toLowerCase().includes("siège") ? "L'Ordonnateur" : "Le Sous-Ordonnateur"}
                   </div>
                 </div>
               </div>
@@ -627,7 +730,7 @@ export default function OrdreImputationPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <Label className="text-xs font-semibold text-muted-foreground">
-                  Province (optionnel)
+                  Province / Ville <span className="text-red-500">*</span>
                 </Label>
                 <select
                     className="h-10 min-w-[250px] rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10 disabled:cursor-not-allowed disabled:opacity-60"
@@ -637,8 +740,9 @@ export default function OrdreImputationPage() {
                       setRubriqueTotals([]);
                     }}
                     disabled={!selectedRegion || provinces.length === 0 || user?.role === "PROV"}
+                    required
                 >
-                  <option value="">-- Toutes les Provinces --</option>
+                  <option value="">-- Selectionner la Province --</option>
                   {provinces.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -671,7 +775,7 @@ export default function OrdreImputationPage() {
               <div className="flex items-end">
                 <Button
                     onClick={handleLoadTotals}
-                    disabled={!selectedRegion || loadingTotals}
+                    disabled={!selectedRegion || !selectedProvince || loadingTotals}
                     className="bg-gradient-to-r from-[#1A3A8A] to-[#0A1A44] text-white shadow-md hover:shadow-lg"
                 >
                   {loadingTotals ? (
