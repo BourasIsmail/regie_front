@@ -267,4 +267,14 @@ export const authApi = {
         method: "POST",
         body: data,
       }),
+
+  changePassword: (data: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) =>
+      apiRequest<{ message: string }>("/auth/change-password", {
+        method: "POST",
+        body: data,
+      }),
 };
