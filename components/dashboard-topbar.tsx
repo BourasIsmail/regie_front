@@ -12,6 +12,7 @@ import {
   FileText,
   Users,
   LogOut,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,12 @@ const navItems: NavItem[] = [
     href: "/dashboard/users",
     icon: Users,
     roles: ["ADMIN"],
+  },
+  {
+    label: "Mon Compte",
+    href: "/dashboard/settings",
+    icon: KeyRound,
+    roles: ["ADMIN", "REGION", "PROV", "BUDGET"],
   },
 ];
 
