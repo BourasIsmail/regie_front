@@ -455,24 +455,28 @@ export default function PlafondsPage() {
                         </td>
                         <td className="h-14 px-4">
                           <div className="flex items-center justify-end gap-1">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                                title="Modifier"
-                                onClick={() => handleEdit(p)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-3 text-xs text-[#059669] border-[#059669] hover:bg-[#059669] hover:text-white"
-                                title="Alimenter"
-                                onClick={() => setAvanceModal(p)}
-                            >
-                              Alimenter
-                            </Button>
+                            {user?.role === "ADMIN" && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                    title="Modifier"
+                                    onClick={() => handleEdit(p)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                            )}
+                            {(user?.role === "ADMIN" || user?.role === "REGION") && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-3 text-xs text-[#059669] border-[#059669] hover:bg-[#059669] hover:text-white"
+                                    title="Alimenter"
+                                    onClick={() => setAvanceModal(p)}
+                                >
+                                  Alimenter
+                                </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
