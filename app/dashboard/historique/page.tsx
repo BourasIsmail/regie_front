@@ -90,6 +90,7 @@ export default function HistoriquePage() {
   const [filterProvince, setFilterProvince] = useState("");
   const [filterCompte, setFilterCompte] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [filterCommentaire, setFilterCommentaire] = useState("");
   const [filterDateStart, setFilterDateStart] = useState("");
   const [filterDateEnd, setFilterDateEnd] = useState("");
 
@@ -102,8 +103,8 @@ export default function HistoriquePage() {
       if (user?.role === "PROV" && user.provinceId) {
         // PROV can only see their province's history
         data = await historiqueApi.getByProvince(user.provinceId);
-      } else if (user?.role === "REGION" && user.regionId) {
-        // REGION can see all provinces in their region
+      } else if ((user?.role === "REGION" || user?.role === "VIEW_REGION") && user.regionId) {
+        // REGION/VIEW_REGION can see all provinces in their region
         data = await historiqueApi.getByRegion(user.regionId);
       } else {
         // ADMIN can see all
@@ -125,7 +126,7 @@ export default function HistoriquePage() {
           setFilterRegion(String(prov.regionId));
           setFilterProvince(String(user.provinceId));
         }
-      } else if (user?.role === "REGION" && user.regionId) {
+      } else if ((user?.role === "REGION" || user?.role === "VIEW_REGION") && user.regionId) {
         setFilterRegion(String(user.regionId));
       }
     } catch {
@@ -163,13 +164,16 @@ export default function HistoriquePage() {
     const matchType = filterType
         ? (h.typeOperation || "").toLowerCase() === filterType.toLowerCase()
         : true;
+    const matchCommentaire = filterCommentaire
+        ? (h.commentaire || "").toLowerCase().includes(filterCommentaire.toLowerCase())
+        : true;
     const matchDateStart = filterDateStart
         ? new Date(h.createdAt) >= new Date(filterDateStart)
         : true;
     const matchDateEnd = filterDateEnd
         ? new Date(h.createdAt) <= new Date(filterDateEnd + "T23:59:59")
         : true;
-    return matchRegion && matchProvince && matchCompte && matchType && matchDateStart && matchDateEnd;
+    return matchRegion && matchProvince && matchCompte && matchType && matchCommentaire && matchDateStart && matchDateEnd;
   });
 
   const resetFilters = () => {
@@ -182,6 +186,7 @@ export default function HistoriquePage() {
     }
     setFilterCompte("");
     setFilterType("");
+    setFilterCommentaire("");
     setFilterDateStart("");
     setFilterDateEnd("");
   };
@@ -264,7 +269,7 @@ export default function HistoriquePage() {
               Filtrer l{"'"}historique
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {/* Region filter - only for ADMIN */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-muted-foreground">
@@ -277,7 +282,7 @@ export default function HistoriquePage() {
                     setFilterRegion(e.target.value);
                     setFilterProvince("");
                   }}
-                  disabled={user?.role === "REGION" || user?.role === "PROV"}
+                  disabled={user?.role === "REGION" || user?.role === "PROV" || user?.role === "VIEW_REGION"}
               >
                 <option value="">Toutes les regions</option>
                 {regions.map((r) => (
@@ -338,6 +343,18 @@ export default function HistoriquePage() {
                 <option value="modification">Modification</option>
                 <option value="suppression">Suppression</option>
               </select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Commentaire
+              </label>
+              <Input
+                  type="text"
+                  placeholder="Rechercher dans les commentaires..."
+                  value={filterCommentaire}
+                  onChange={(e) => setFilterCommentaire(e.target.value)}
+                  className="h-10 text-sm"
+              />
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-muted-foreground">

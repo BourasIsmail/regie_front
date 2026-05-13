@@ -150,8 +150,8 @@ export default function DashboardPage() {
                 if (prov) {
                     setSelectedRegion(prov.regionId);
                 }
-            } else if (user?.role === "REGION" && user.regionId) {
-                // REGION: pre-fill and lock region only
+            } else if ((user?.role === "REGION" || user?.role === "VIEW_REGION") && user.regionId) {
+                // REGION/VIEW_REGION: pre-fill and lock region only
                 setSelectedRegion(user.regionId);
             }
         } catch {
@@ -561,7 +561,7 @@ export default function DashboardPage() {
                                 setSelectedRegion(e.target.value ? Number(e.target.value) : "");
                                 setSelectedProvince("");
                             }}
-                            disabled={user?.role === "REGION" || user?.role === "PROV"}
+                            disabled={user?.role === "REGION" || user?.role === "PROV" || user?.role === "VIEW_REGION"}
                         >
                             <option value="">-- Selectionnez une Region --</option>
                             {regions.map((r) => (
@@ -866,21 +866,23 @@ export default function DashboardPage() {
                             </div>
                         )}
 
-                        {/* Save Button */}
-                        <div className="flex justify-end border-t border-border/60 px-6 py-4">
-                            <Button
-                                onClick={handleSaveAll}
-                                disabled={submitting}
-                                className="bg-[#059669] text-white hover:bg-[#047857]"
-                            >
-                                {submitting ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Save className="mr-2 h-4 w-4" />
-                                )}
-                                Enregistrer les Depenses Saisies
-                            </Button>
-                        </div>
+                        {/* Save Button - Hidden for VIEW_REGION */}
+                        {user?.role !== "VIEW_REGION" && (
+                            <div className="flex justify-end border-t border-border/60 px-6 py-4">
+                                <Button
+                                    onClick={handleSaveAll}
+                                    disabled={submitting}
+                                    className="bg-[#059669] text-white hover:bg-[#047857]"
+                                >
+                                    {submitting ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="mr-2 h-4 w-4" />
+                                    )}
+                                    Enregistrer les Depenses Saisies
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Transactions List Section - Filter & Historique */}
@@ -1052,8 +1054,8 @@ export default function DashboardPage() {
                                                             </Button>
                                                         </>
                                                     )}
-                                                    {/* Edit button for all roles on pending transactions */}
-                                                    {tx.statut === "EN_ATTENTE" && (
+                                                    {/* Edit button for all roles except VIEW_REGION on pending transactions */}
+                                                    {tx.statut === "EN_ATTENTE" && user?.role !== "VIEW_REGION" && (
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"

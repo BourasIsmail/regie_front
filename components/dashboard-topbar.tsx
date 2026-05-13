@@ -28,25 +28,25 @@ const navItems: NavItem[] = [
     label: "Tableau de Bord",
     href: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["ADMIN", "REGION", "PROV", "BUDGET"],
+    roles: ["ADMIN", "REGION", "PROV", "BUDGET", "VIEW_REGION"],
   },
   {
     label: "Gestion Plafonds",
     href: "/dashboard/plafonds",
     icon: Settings,
-    roles: ["ADMIN", "REGION"],
+    roles: ["ADMIN", "REGION", "VIEW_REGION"],
   },
   {
     label: "Historique",
     href: "/dashboard/historique",
     icon: History,
-    roles: ["ADMIN", "REGION", "PROV"],
+    roles: ["ADMIN", "REGION", "PROV", "VIEW_REGION"],
   },
   {
     label: "Ordre d'Imputation",
     href: "/dashboard/ordre-imputation",
     icon: FileText,
-    roles: ["ADMIN", "REGION"],
+    roles: ["ADMIN", "REGION", "VIEW_REGION"],
   },
   {
     label: "Utilisateurs",
@@ -58,7 +58,7 @@ const navItems: NavItem[] = [
     label: "Mon Compte",
     href: "/dashboard/settings",
     icon: KeyRound,
-    roles: ["ADMIN", "REGION", "PROV", "BUDGET"],
+    roles: ["ADMIN", "REGION", "PROV", "BUDGET", "VIEW_REGION"],
   },
 ];
 

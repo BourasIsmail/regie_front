@@ -102,7 +102,7 @@ export default function PlafondsPage() {
           setFilterProvince(String(user.provinceId));
           setFiltersApplied(true);
         }
-      } else if (user?.role === "REGION" && user.regionId) {
+      } else if ((user?.role === "REGION" || user?.role === "VIEW_REGION") && user.regionId) {
         setFilterRegion(String(user.regionId));
         setFiltersApplied(true);
       }
@@ -202,7 +202,7 @@ export default function PlafondsPage() {
       setFilterProvince("");
     }
     setFilterCompte("");
-    setFiltersApplied(user?.role === "REGION" || user?.role === "PROV");
+    setFiltersApplied(user?.role === "REGION" || user?.role === "PROV" || user?.role === "VIEW_REGION");
   };
 
   // Get unique compte codes for filter dropdown
@@ -300,7 +300,7 @@ export default function PlafondsPage() {
                     setFilterRegion(e.target.value);
                     setFilterProvince("");
                   }}
-                  disabled={user?.role === "REGION" || user?.role === "PROV"}
+                  disabled={user?.role === "REGION" || user?.role === "PROV" || user?.role === "VIEW_REGION"}
               >
                 <option value="">Toutes les regions</option>
                 {regions.map((r) => (
