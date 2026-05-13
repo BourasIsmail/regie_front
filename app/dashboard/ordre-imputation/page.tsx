@@ -205,7 +205,7 @@ export default function OrdreImputationPage() {
           const regionProvinces = provincesData.filter((p) => p.regionId === prov.regionId);
           setProvinces(regionProvinces);
         }
-      } else if (user?.role === "REGION" && user.regionId) {
+      } else if ((user?.role === "REGION" || user?.role === "VIEW_REGION") && user.regionId) {
         setSelectedRegion(String(user.regionId));
         const regionProvinces = provincesData.filter((p) => p.regionId === user.regionId);
         setProvinces(regionProvinces);
@@ -718,7 +718,7 @@ export default function OrdreImputationPage() {
                       setSelectedRegion(e.target.value);
                       setRubriqueTotals([]);
                     }}
-                    disabled={user?.role === "REGION" || user?.role === "PROV"}
+                    disabled={user?.role === "REGION" || user?.role === "PROV" || user?.role === "VIEW_REGION"}
                 >
                   <option value="">-- Selectionner la Region --</option>
                   {regions.map((r) => (
