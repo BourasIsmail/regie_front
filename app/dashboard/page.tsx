@@ -1132,8 +1132,8 @@ export default function DashboardPage() {
                                                             <Pencil className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    {/* Delete button - only for ADMIN (all statuses), not ADMIN_VIEW */}
-                                                    {user?.role === "ADMIN" && (
+                                                    {/* Delete button - for ADMIN (all statuses) and REGION (pending only), not ADMIN_VIEW */}
+                                                    {(user?.role === "ADMIN" || (user?.role === "REGION" && tx.statut === "EN_ATTENTE")) && (
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
