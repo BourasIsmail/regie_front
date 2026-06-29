@@ -923,8 +923,8 @@ export default function DashboardPage() {
                             </div>
                         )}
 
-                        {/* Save Button - Hidden for VIEW_REGION */}
-                        {user?.role !== "VIEW_REGION" && (
+                        {/* Save Button - Hidden for VIEW_REGION and ADMIN_VIEW (read-only) */}
+                        {user?.role !== "VIEW_REGION" && user?.role !== "ADMIN_VIEW" && (
                             <div className="flex justify-end gap-3 border-t border-border/60 px-6 py-4">
                                 {activeEditingPlafondId !== null && (
                                     <Button
@@ -1120,8 +1120,8 @@ export default function DashboardPage() {
                                                             </Button>
                                                         </>
                                                     )}
-                                                    {/* Edit button for all roles except VIEW_REGION on pending transactions */}
-                                                    {tx.statut === "EN_ATTENTE" && user?.role !== "VIEW_REGION" && (
+                                                    {/* Edit button for all roles except VIEW_REGION and ADMIN_VIEW on pending transactions */}
+                                                    {tx.statut === "EN_ATTENTE" && user?.role !== "VIEW_REGION" && user?.role !== "ADMIN_VIEW" && (
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
@@ -1132,7 +1132,7 @@ export default function DashboardPage() {
                                                             <Pencil className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    {/* Delete button - only for ADMIN (all statuses) */}
+                                                    {/* Delete button - only for ADMIN (all statuses), not ADMIN_VIEW */}
                                                     {user?.role === "ADMIN" && (
                                                         <Button
                                                             size="sm"

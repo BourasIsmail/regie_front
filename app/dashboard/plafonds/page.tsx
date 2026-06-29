@@ -82,6 +82,14 @@ export default function PlafondsPage() {
     commentaire: "",
   });
 
+  // Correction modal
+  const [correctionModal, setCorrectionModal] = useState<PlafondRegie | null>(null);
+  const [correctionForm, setCorrectionForm] = useState({
+    nouveauEncaissement: "",
+    motif: "",
+  });
+  const [correctionSubmitting, setCorrectionSubmitting] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -186,6 +194,44 @@ export default function PlafondsPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCorrection = async () => {
+    if (!correctionModal || !correctionForm.nouveauEncaissement || !correctionForm.motif || Number(correctionForm.nouveauEncaissement) < 0)
+      return;
+
+    // Validation: new encaissement cannot be greater than current encaissement
+    const nouveauMontant = Number(correctionForm.nouveauEncaissement);
+    const ancienMontant = Number(correctionModal.plafondEncaissement);
+    if (nouveauMontant > ancienMontant) {
+      setError(
+          `La correction ne peut pas augmenter l'encaissement. Montant actuel: ${ancienMontant.toFixed(2)} DH. Vous ne pouvez corriger que vers le bas pour rectifier une erreur de saisie.`
+      );
+      return;
+    }
+
+    setCorrectionSubmitting(true);
+    setError("");
+    try {
+      await plafondsApi.corriger(correctionModal.id, {
+        nouveauEncaissement: nouveauMontant,
+        motif: correctionForm.motif,
+      });
+      setCorrectionModal(null);
+      setCorrectionForm({
+        nouveauEncaissement: "",
+        motif: "",
+      });
+      await fetchData();
+    } catch (err) {
+      setError(
+          err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la correction."
+      );
+    } finally {
+      setCorrectionSubmitting(false);
     }
   };
 
@@ -477,6 +523,17 @@ export default function PlafondsPage() {
                                   Alimenter
                                 </Button>
                             )}
+                            {(user?.role === "ADMIN" || user?.role === "REGION") && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-3 text-xs text-amber-600 border-amber-600 hover:bg-amber-600 hover:text-white"
+                                    title="Corriger l'encaissement"
+                                    onClick={() => setCorrectionModal(p)}
+                                >
+                                  Corriger
+                                </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -751,6 +808,88 @@ export default function PlafondsPage() {
                       {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       <Save className="mr-2 h-4 w-4" />
                       Enregistrer
+                    </Button>
+                  </div>
+                </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Correction Modal */}
+        <Dialog open={!!correctionModal} onOpenChange={(open) => !open && setCorrectionModal(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Corriger l'Encaissement</DialogTitle>
+            </DialogHeader>
+            {correctionModal && (
+                <div className="space-y-4">
+                  {error && (
+                      <div className="rounded-lg bg-red-50 p-3 text-xs text-red-900 border border-red-200">
+                        <AlertCircle className="mb-1 inline h-3.5 w-3.5" /> {error}
+                      </div>
+                  )}
+
+                  <div>
+                    <Label className="text-xs font-semibold">Rubrique</Label>
+                    <div className="mt-1 rounded-lg bg-secondary/50 p-2 text-sm">
+                      {correctionModal.libelle} ({correctionModal.compteCode})
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold">Encaissement Actuel</Label>
+                    <div className="mt-1 rounded-lg bg-secondary/50 p-2 text-sm font-medium">
+                      {formatCurrency(correctionModal.plafondEncaissement)}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs font-semibold">Nouvel Encaissement</Label>
+                    <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={correctionForm.nouveauEncaissement}
+                        onChange={(e) =>
+                            setCorrectionForm({ ...correctionForm, nouveauEncaissement: e.target.value })
+                        }
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs font-semibold">Motif de la Correction</Label>
+                    <textarea
+                        className="h-16 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                        placeholder="Expliquer la raison de cette correction"
+                        value={correctionForm.motif}
+                        onChange={(e) =>
+                            setCorrectionForm({ ...correctionForm, motif: e.target.value })
+                        }
+                    />
+                  </div>
+
+                  <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+                    <AlertCircle className="mb-1 inline h-3.5 w-3.5" /> Cette opération sera enregistrée dans l'historique
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setCorrectionModal(null)}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Annuler
+                    </Button>
+                    <Button
+                        onClick={handleCorrection}
+                        disabled={correctionSubmitting || !correctionForm.nouveauEncaissement || !correctionForm.motif}
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      {correctionSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      <Save className="mr-2 h-4 w-4" />
+                      Corriger
                     </Button>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import { getCookie, setCookie, removeCookie } from "@/lib/cookies";
 
-const API_BASE_URL =/*"http://localhost:8080/api"*//*"http://172.16.20.181:8080/api"*/ "https://services.entraide.ma/api/api";
+const API_BASE_URL =/*"http://localhost:8080/api"*//*"http://172.16.20.181:8080/api"*/"https://services.entraide.ma/api/api";
 
 interface ApiOptions {
   method?: string;
@@ -182,6 +182,10 @@ export const plafondsApi = {
       apiRequest<PlafondRegie>(`/plafonds/${id}/alimenter`, {
         method: "POST",
         body: data,
+      }),
+  corriger: (id: number, data: { nouveauEncaissement: number; motif: string }) =>
+      apiRequest<PlafondRegie>(`/plafonds/${id}/corriger?nouveauEncaissement=${data.nouveauEncaissement}&motif=${encodeURIComponent(data.motif)}`, {
+        method: "POST",
       }),
 };
 

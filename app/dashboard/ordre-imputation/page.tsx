@@ -34,8 +34,8 @@ const SIEGE_CENTRAL_NAME = "Siege central";
 const CITY_CODES: Record<string, string> = {
   "AGADIR": "5165-65", "AGADIR-IDA-OU-TANANE": "5165-65",
   "AL HOCEIMA": "5165-66",
-  "AOUSERD": "5165-176",
-  "ASSA ZAG": "5165-123",
+  "AOUSERD": "5165-176", "AOUSSERD": "5165-176",
+  "ASSA ZAG": "5165-123", "ASSA-ZAG": "5165-123",
   "AZILAL": "5165-67",
   "BENI MELLAL": "5165-68",
   "BEN SLIMANE": "5165-69", "BENSLIMANE": "5165-69",
@@ -60,12 +60,12 @@ const CITY_CODES: Record<string, string> = {
   "DRIOUICH": "5165-173", "DRIOUCH": "5165-173",
   "EL HAJEB": "5165-138",
   "EL JADIDA": "5165-78",
-  "EL KELAA": "5165-79", "EL KELAA DES SRAGHNA": "5165-79",
+  "EL KELAA": "5165-79", "EL KELAA DES SRAGHNA": "5165-79", "KELAAT SRAGHNA": "5165-79",
   "ERRACHIDIA": "5165-80",
   "ESSAOUIRA": "5165-81",
   "FES": "5165-64",
   "FIGUIG": "5165-82",
-  "FKIH BEN SALEH": "5165-182",
+  "FKIH BEN SALEH": "5165-182", "FQUIH BEN SALAH": "5165-182",
   "FNIDEQ": "5165-155", "M'DIQ-FNIDEQ": "5165-155",
   "GUELMIM": "5165-83",
   "GUERSIF": "5165-180", "GUERCIF": "5165-180",
@@ -86,7 +86,7 @@ const CITY_CODES: Record<string, string> = {
   "MY YAAKOUB": "5165-159", "MOULAY YACOUB": "5165-159",
   "NADOR": "5165-96",
   "OUARZAZATE": "5165-97",
-  "OUAZZANE": "5165-178",
+  "OUAZZANE": "5165-178", "OUEZZANE": "5165-178",
   "OUJDA": "5165-61", "OUJDA-ANGAD": "5165-61",
   "RABAT": "5165-62",
   "RHAMNA": "5165-174", "REHAMNA": "5165-174",
@@ -104,7 +104,7 @@ const CITY_CODES: Record<string, string> = {
   "FAHS ANJRA": "5165-126", "FAHS-ANJRA": "5165-126",
   "TAOUNATE": "5165-107",
   "TAOURIRT": "5165-132",
-  "TARFAIA": "5165-184",
+  "TARFAIA": "5165-184", "TARFAYA": "5165-184",
   "TAROUDANT": "5165-108",
   "TATA": "5165-109",
   "TAZA": "5165-110",
@@ -168,6 +168,7 @@ export default function OrdreImputationPage() {
       new Set()
   );
   const [showPrint, setShowPrint] = useState(false);
+  const [error, setError] = useState("");
 
   // Form fields
   const [oiNumero, setOiNumero] = useState("");
@@ -221,7 +222,7 @@ export default function OrdreImputationPage() {
 
   // Fetch provinces when region changes (only if not pre-filled by role)
   useEffect(() => {
-    if (selectedRegion && user?.role === "ADMIN") {
+    if (selectedRegion && (user?.role === "ADMIN" || user?.role === "ADMIN_VIEW")) {
       provincesApi.getByRegion(Number(selectedRegion)).then(setProvinces).catch(() => setProvinces([]));
       setSelectedProvince("");
     }
@@ -411,6 +412,11 @@ export default function OrdreImputationPage() {
   const montantAAlimenter = selectedItems.reduce((s, r) => s + Math.min(r.plafondAnnuel, r.totalDepensesValidees), 0);
 
   const handlePrint = () => {
+    if (!oiNumero.trim()) {
+      setError("Veuillez saisir le numéro d'ordre d'imputation avant de générer.");
+      return;
+    }
+    setError("");
     setShowPrint(true);
     setTimeout(() => window.print(), 300);
   };
@@ -984,7 +990,7 @@ export default function OrdreImputationPage() {
                   )}
                   <Button
                       onClick={handlePrint}
-                      disabled={selectedItems.length === 0}
+                      disabled={selectedItems.length === 0 || !oiNumero.trim()}
                       className="ml-auto bg-gradient-to-r from-[#059669] to-[#047857] text-white shadow-md hover:shadow-lg"
                   >
                     <Printer className="mr-2 h-4 w-4" />

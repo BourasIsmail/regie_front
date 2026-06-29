@@ -25,9 +25,26 @@ import {
   Users,
   X,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-const ROLES = ["ADMIN", "REGION", "VIEW_REGION", "PROV", "BUDGET"];
+const ROLES = ["ADMIN", "ADMIN_VIEW", "REGION", "VIEW_REGION", "PROV", "BUDGET"];
+const ITEMS_PER_PAGE = 10;
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -38,9 +55,10 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -50,7 +68,7 @@ export default function UsersPage() {
   });
 
   useEffect(() => {
-    if (currentUser && currentUser.role !== "ADMIN") {
+    if (currentUser && currentUser.role !== "ADMIN" && currentUser.role !== "ADMIN_VIEW") {
       router.push("/dashboard");
     }
   }, [currentUser, router]);
@@ -106,7 +124,7 @@ export default function UsersPage() {
           provinceId: form.provinceId ?? undefined,
         });
       }
-      setShowForm(false);
+      setShowModal(false);
       setEditingId(null);
       setForm({
         email: "",
@@ -115,6 +133,7 @@ export default function UsersPage() {
         regionId: null,
         provinceId: null,
       });
+      setCurrentPage(1);
       await fetchData();
     } catch (err) {
       setError(
@@ -134,7 +153,7 @@ export default function UsersPage() {
       provinceId: u.provinceId,
     });
     setEditingId(u.id);
-    setShowForm(true);
+    setShowModal(true);
   };
 
   const handleDelete = async (id: number) => {
@@ -189,6 +208,12 @@ export default function UsersPage() {
     );
   }
 
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedUsers = filtered.slice(
+      (currentPage - 1) * ITEMS_PER_PAGE,
+      currentPage * ITEMS_PER_PAGE
+  );
+
   return (
       <div className="flex flex-col gap-8">
         {/* Page Header */}
@@ -201,189 +226,31 @@ export default function UsersPage() {
               Gestion des comptes utilisateurs
             </p>
           </div>
-          <Button
-              onClick={() => {
-                setForm({
-                  email: "",
-                  password: "",
-                  role: "PROV",
-                  regionId: null,
-                  provinceId: null,
-                });
-                setEditingId(null);
-                setShowForm(true);
-              }}
-              className="bg-gradient-to-r from-[#1A3A8A] to-[#0A1A44] text-white shadow-md hover:shadow-lg"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvel utilisateur
-          </Button>
+          {currentUser?.role !== "ADMIN_VIEW" && (
+              <Button
+                  onClick={() => {
+                    setForm({
+                      email: "",
+                      password: "",
+                      role: "PROV",
+                      regionId: null,
+                      provinceId: null,
+                    });
+                    setEditingId(null);
+                    setShowModal(true);
+                  }}
+                  className="bg-gradient-to-r from-[#1A3A8A] to-[#0A1A44] text-white shadow-md hover:shadow-lg"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvel utilisateur
+              </Button>
+          )}
         </div>
 
         {error && (
             <div className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
-            </div>
-        )}
-
-        {/* Create/Edit Form */}
-        {showForm && (
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
-              <div className="flex items-center justify-between border-b border-border/60 bg-gradient-to-r from-[#0A1A44]/[0.02] to-transparent px-7 py-4">
-                <div>
-                  <h2 className="text-sm font-bold tracking-tight text-[#0A1A44]">
-                    {editingId
-                        ? "Modifier l'utilisateur"
-                        : "Nouvel utilisateur"}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {editingId
-                        ? "Modifiez les informations du compte"
-                        : "Creez un nouveau compte utilisateur"}
-                  </p>
-                </div>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setShowForm(false);
-                      setEditingId(null);
-                    }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="p-7">
-                <form
-                    onSubmit={handleSubmit}
-                    className="grid grid-cols-1 gap-4 md:grid-cols-2"
-                >
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">
-                      Email
-                    </Label>
-                    <Input
-                        type="email"
-                        value={form.email}
-                        onChange={(e) =>
-                            setForm({ ...form, email: e.target.value })
-                        }
-                        placeholder="utilisateur@exemple.ma"
-                        required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">
-                      Mot de passe
-                      {editingId ? " (laisser vide pour conserver)" : ""}
-                    </Label>
-                    <Input
-                        type="password"
-                        value={form.password}
-                        onChange={(e) =>
-                            setForm({ ...form, password: e.target.value })
-                        }
-                        placeholder={
-                          editingId ? "Nouveau mot de passe" : "Mot de passe"
-                        }
-                        required={!editingId}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">
-                      Role
-                    </Label>
-                    <select
-                        className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
-                        value={form.role}
-                        onChange={(e) =>
-                            setForm({
-                              ...form,
-                              role: e.target.value,
-                              regionId: null,
-                              provinceId: null,
-                            })
-                        }
-                        required
-                    >
-                      {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                      ))}
-                    </select>
-                  </div>
-                  {(form.role === "REGION" || form.role === "VIEW_REGION" || form.role === "PROV") && (
-                      <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-semibold text-muted-foreground">
-                          Region
-                        </Label>
-                        <select
-                            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
-                            value={form.regionId ?? ""}
-                            onChange={(e) =>
-                                setForm({
-                                  ...form,
-                                  regionId: e.target.value
-                                      ? Number(e.target.value)
-                                      : null,
-                                  provinceId: null,
-                                })
-                            }
-                            required
-                        >
-                          <option value="">Selectionner...</option>
-                          {regions.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.name}
-                              </option>
-                          ))}
-                        </select>
-                      </div>
-                  )}
-                  {form.role === "PROV" && form.regionId && (
-                      <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-semibold text-muted-foreground">
-                          Province
-                        </Label>
-                        <select
-                            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
-                            value={form.provinceId ?? ""}
-                            onChange={(e) =>
-                                setForm({
-                                  ...form,
-                                  provinceId: e.target.value
-                                      ? Number(e.target.value)
-                                      : null,
-                                })
-                            }
-                            required
-                        >
-                          <option value="">Selectionner...</option>
-                          {provincesForRegion.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                          ))}
-                        </select>
-                      </div>
-                  )}
-                  <div className="flex items-end md:col-span-2">
-                    <Button
-                        type="submit"
-                        disabled={submitting}
-                        className="bg-gradient-to-r from-[#1A3A8A] to-[#0A1A44] text-white"
-                    >
-                      {submitting ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      {editingId ? "Mettre a jour" : "Creer le compte"}
-                    </Button>
-                  </div>
-                </form>
-              </div>
             </div>
         )}
 
@@ -402,88 +269,255 @@ export default function UsersPage() {
               <Input
                   placeholder="Rechercher..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="pl-10"
               />
             </div>
           </div>
+
           <div className="overflow-x-auto">
-            {filtered.length === 0 ? (
+            {paginatedUsers.length === 0 ? (
                 <p className="py-12 text-center text-sm text-muted-foreground">
-                  Aucun utilisateur trouve
+                  {filtered.length === 0 ? "Aucun utilisateur trouvé" : "Aucun utilisateur sur cette page"}
                 </p>
             ) : (
-                <table className="w-full min-w-[700px] border-separate border-spacing-0 text-sm">
-                  <thead>
-                  <tr className="bg-gradient-to-r from-[#0A1A44] to-[#1A3A8A]">
-                    <th className="h-12 border-r border-white/10 px-4 text-left text-[11.5px] font-semibold uppercase tracking-widest text-white">
-                      Email
-                    </th>
-                    <th className="h-12 border-r border-white/10 px-4 text-left text-[11.5px] font-semibold uppercase tracking-widest text-white">
-                      Role
-                    </th>
-                    <th className="h-12 border-r border-white/10 px-4 text-left text-[11.5px] font-semibold uppercase tracking-widest text-white">
-                      Region
-                    </th>
-                    <th className="h-12 border-r border-white/10 px-4 text-left text-[11.5px] font-semibold uppercase tracking-widest text-white">
-                      Province
-                    </th>
-                    <th className="h-12 px-4 text-right text-[11.5px] font-semibold uppercase tracking-widest text-white">
-                      Actions
-                    </th>
-                  </tr>
-                  </thead>
-                  <tbody>
-                  {filtered.map((u, i) => (
-                      <tr
-                          key={u.id}
-                          className={`border-b border-border/60 transition-colors hover:bg-secondary/40 ${
-                              i % 2 === 0 ? "bg-card" : "bg-secondary/20"
-                          }`}
-                      >
-                        <td className="h-14 px-4 font-medium text-foreground">
-                          {u.email}
-                        </td>
-                        <td className="h-14 px-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gradient-to-r from-[#0A1A44] to-[#1A3A8A]">
+                      <TableHead className="text-white">Email</TableHead>
+                      <TableHead className="text-white">Rôle</TableHead>
+                      <TableHead className="text-white">Région</TableHead>
+                      <TableHead className="text-white">Province</TableHead>
+                      <TableHead className="text-right text-white">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUsers.map((u) => (
+                        <TableRow key={u.id} className="hover:bg-secondary/40">
+                          <TableCell className="font-medium">{u.email}</TableCell>
+                          <TableCell>
                       <span
                           className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getRoleBadge(u.role)}`}
                       >
                         {u.role}
                       </span>
-                        </td>
-                        <td className="h-14 px-4 text-muted-foreground">
-                          {u.regionName || "-"}
-                        </td>
-                        <td className="h-14 px-4 text-muted-foreground">
-                          {u.provinceName || "-"}
-                        </td>
-                        <td className="h-14 px-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                                onClick={() => handleEdit(u)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDelete(u.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                  ))}
-                  </tbody>
-                </table>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {u.regionName || "-"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {u.provinceName || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {currentUser?.role !== "ADMIN_VIEW" && (
+                                  <>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => handleEdit(u)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                        onClick={() => handleDelete(u.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             )}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border/60 bg-gradient-to-r from-[#0A1A44]/[0.02] to-transparent px-7 py-4">
+                <p className="text-xs text-muted-foreground">
+                  Page {currentPage} sur {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+          )}
         </div>
+
+        {/* User Form Modal */}
+        <Dialog open={showModal} onOpenChange={setShowModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {editingId ? "Modifier l'utilisateur" : "Nouvel utilisateur"}
+              </DialogTitle>
+            </DialogHeader>
+
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Email
+                </Label>
+                <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="utilisateur@exemple.ma"
+                    required
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Mot de passe
+                  {editingId ? " (laisser vide pour conserver)" : ""}
+                </Label>
+                <Input
+                    type="password"
+                    value={form.password}
+                    onChange={(e) =>
+                        setForm({ ...form, password: e.target.value })
+                    }
+                    placeholder={
+                      editingId ? "Nouveau mot de passe" : "Mot de passe"
+                    }
+                    required={!editingId}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Rôle
+                </Label>
+                <select
+                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                    value={form.role}
+                    onChange={(e) =>
+                        setForm({
+                          ...form,
+                          role: e.target.value,
+                          regionId: null,
+                          provinceId: null,
+                        })
+                    }
+                    required
+                >
+                  {ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              {(form.role === "REGION" || form.role === "VIEW_REGION" || form.role === "PROV") && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">
+                      Région
+                    </Label>
+                    <select
+                        className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                        value={form.regionId ?? ""}
+                        onChange={(e) =>
+                            setForm({
+                              ...form,
+                              regionId: e.target.value
+                                  ? Number(e.target.value)
+                                  : null,
+                              provinceId: null,
+                            })
+                        }
+                        required
+                    >
+                      <option value="">Sélectionner...</option>
+                      {regions.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+              )}
+
+              {form.role === "PROV" && form.regionId && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">
+                      Province
+                    </Label>
+                    <select
+                        className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-medium focus:border-[#1A3A8A] focus:outline-none focus:ring-2 focus:ring-[#1A3A8A]/10"
+                        value={form.provinceId ?? ""}
+                        onChange={(e) =>
+                            setForm({
+                              ...form,
+                              provinceId: e.target.value
+                                  ? Number(e.target.value)
+                                  : null,
+                            })
+                        }
+                        required
+                    >
+                      <option value="">Sélectionner...</option>
+                      {provincesForRegion.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+              )}
+
+              <div className="flex gap-2 md:col-span-2">
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingId(null);
+                    }}
+                >
+                  Annuler
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={submitting}
+                    className="bg-gradient-to-r from-[#1A3A8A] to-[#0A1A44] text-white"
+                >
+                  {submitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {editingId ? "Mettre à jour" : "Créer le compte"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
   );
 }
