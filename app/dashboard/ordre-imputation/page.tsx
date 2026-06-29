@@ -128,7 +128,7 @@ function getCityCode(provinceName: string): string {
       return code;
     }
   }
-  return "5165-000"; // Default fallback
+  return "5165-130"; // Default fallback - Siege Central code
 }
 
 function formatCurrencyDH(value: number) {
@@ -170,9 +170,7 @@ export default function OrdreImputationPage() {
   const [showPrint, setShowPrint] = useState(false);
 
   // Form fields
-  const [oiNumero, setOiNumero] = useState(
-      `OI-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, "0")}`
-  );
+  const [oiNumero, setOiNumero] = useState("");
   const [oiDate, setOiDate] = useState(
       new Date().toISOString().split("T")[0]
   );
@@ -443,7 +441,9 @@ export default function OrdreImputationPage() {
   if (showPrint) {
     const regionName = regions.find((r) => String(r.id) === selectedRegion)?.name || "";
     const provinceName = provinces.find((p) => String(p.id) === selectedProvince)?.name || "";
-    const cityCode = getCityCode(provinceName);
+    // If no province found and region is "Siege central", use "SIEGE CENTRAL" as the city name
+    const cityName = provinceName || (regionName.toLowerCase().includes("siege") ? "SIEGE CENTRAL" : "");
+    const cityCode = getCityCode(cityName);
 
     return (
         <>
@@ -551,13 +551,21 @@ export default function OrdreImputationPage() {
                 <div style={{ minWidth: "130px", padding: "5px 10px", fontSize: "11px" }} />
               </div>
 
+              {/* Period Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", borderBottom: "1px solid #000", padding: "6px 10px" }}>
+                <div style={{ fontSize: "12px" }}>
+                  <span style={{ fontWeight: "bold" }}>Periode :</span>
+                  <span style={{ marginLeft: "8px" }}>{formatDateFR(periodeDebut)} au {formatDateFR(periodeFin)}</span>
+                </div>
+              </div>
+
               {/* Nature Row */}
               <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", borderBottom: "1px solid #000", alignItems: "center" }}>
                 <div style={{ padding: "5px 10px", fontSize: "12px", whiteSpace: "nowrap", borderRight: "1px solid #000", minWidth: "155px" }}>
                   {"Nature de l'operation :"}
                 </div>
                 <div style={{ padding: "5px 10px", fontSize: "13px", fontWeight: "bold", letterSpacing: "1px" }}>
-                  {"REGIE " + provinceName.toUpperCase()}
+                  {"REGIE " + (cityName || provinceName).toUpperCase()}
                 </div>
               </div>
 
@@ -634,7 +642,7 @@ export default function OrdreImputationPage() {
                     {cityCode}
                   </td>
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "left" }}>
-                    {"Regie " + provinceName}
+                    {"Regie " + (cityName || provinceName)}
                   </td>
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }} />
                   <td style={{ border: "1px solid #000", padding: "10px 12px", fontSize: "14px", textAlign: "right" }}>
@@ -658,21 +666,21 @@ export default function OrdreImputationPage() {
 
               {/* Signature Row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderTop: "2px solid #000" }}>
-                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Chef de Service</div>
+                <div style={{ borderRight: "1px solid #000", padding: "8px", fontSize: "11px", textAlign: "center", minHeight: "180px" }}>
+                  <div style={{ fontWeight: "bold" }}>Chef de Service</div>
                 </div>
-                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Chef de division</div>
+                <div style={{ borderRight: "1px solid #000", padding: "8px", fontSize: "11px", textAlign: "center", minHeight: "180px" }}>
+                  <div style={{ fontWeight: "bold" }}>Chef de division</div>
                 </div>
-                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Service Comptable</div>
+                <div style={{ borderRight: "1px solid #000", padding: "8px", fontSize: "11px", textAlign: "center", minHeight: "180px" }}>
+                  <div style={{ fontWeight: "bold" }}>Service Comptable</div>
                 </div>
-                <div style={{ borderRight: "1px solid #000", padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>Le Tresorier Payeur</div>
+                <div style={{ borderRight: "1px solid #000", padding: "8px", fontSize: "11px", textAlign: "center", minHeight: "180px" }}>
+                  <div style={{ fontWeight: "bold" }}>Le Tresorier Payeur</div>
                 </div>
-                <div style={{ padding: "6px 8px", fontSize: "11px", textAlign: "center", minHeight: "70px" }}>
-                  <div style={{ fontWeight: "bold", paddingBottom: "4px", marginBottom: "4px" }}>
-                    {provinceName.toLowerCase().includes("siege") || provinceName.toLowerCase().includes("siège") ? "L'Ordonnateur" : "Le Sous-Ordonnateur"}
+                <div style={{ padding: "8px", fontSize: "11px", textAlign: "center", minHeight: "180px" }}>
+                  <div style={{ fontWeight: "bold" }}>
+                    {(cityName || provinceName).toLowerCase().includes("siege") || (cityName || provinceName).toLowerCase().includes("siège") ? "L'Ordonnateur" : "Le Sous-Ordonnateur"}
                   </div>
                 </div>
               </div>

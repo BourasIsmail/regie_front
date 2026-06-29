@@ -96,6 +96,9 @@ export default function DashboardPage() {
     // Inline transaction forms - one per plafond
     const [inlineForms, setInlineForms] = useState<Record<number, InlineTransaction>>({});
 
+    // Track which plafond row is currently being edited (only one at a time)
+    const [activeEditingPlafondId, setActiveEditingPlafondId] = useState<number | null>(null);
+
     // Alimenter modal state
     const [alimenterModal, setAlimenterModal] = useState<{
         plafond: PlafondRegie;
@@ -227,6 +230,16 @@ export default function DashboardPage() {
         field: keyof InlineTransaction,
         value: string
     ) => {
+        // If another row is being edited and this row is different, show an error
+        if (activeEditingPlafondId !== null && activeEditingPlafondId !== plafondId) {
+            setError("Veuillez d'abord enregistrer ou annuler la dépense en cours avant de saisir une nouvelle.");
+            return;
+        }
+
+        // Set this plafond as the active editing one
+        setActiveEditingPlafondId(plafondId);
+        setError(""); // Clear error when user starts entering data
+
         setInlineForms((prev) => ({
             ...prev,
             [plafondId]: {
@@ -236,14 +249,44 @@ export default function DashboardPage() {
         }));
     };
 
-    const handleSaveAll = async () => {
-        // Collect all forms with montant > 0
-        const toSave = Object.values(inlineForms).filter(
-            (f) => f.montant && Number(f.montant) > 0
-        );
+    // Check if a form row has any data entered
+    const isFormRowEmpty = (plafondId: number): boolean => {
+        const form = inlineForms[plafondId];
+        if (!form) return true;
+        return !form.montant && !form.fournisseur && !form.factureNumero &&
+            !form.factureDate && !form.adresseFournisseur && !form.numeroAp && !form.dateAp;
+    };
 
-        if (toSave.length === 0) {
+    // Clear the active editing row
+    const clearActiveRow = () => {
+        if (activeEditingPlafondId !== null) {
+            setInlineForms((prev) => ({
+                ...prev,
+                [activeEditingPlafondId]: {
+                    ...prev[activeEditingPlafondId],
+                    montant: "",
+                    fournisseur: "",
+                    adresseFournisseur: "",
+                    factureNumero: "",
+                    factureDate: "",
+                    numeroAp: "",
+                    dateAp: "",
+                },
+            }));
+            setActiveEditingPlafondId(null);
+        }
+    };
+
+    const handleSaveAll = async () => {
+        // Only save the active editing row
+        if (activeEditingPlafondId === null) {
             setError("Aucune depense a enregistrer.");
+            return;
+        }
+
+        const form = inlineForms[activeEditingPlafondId];
+        if (!form || !form.montant || Number(form.montant) <= 0) {
+            setError("Veuillez saisir un montant valide.");
             return;
         }
 
@@ -252,26 +295,31 @@ export default function DashboardPage() {
         setSuccess("");
 
         try {
-            for (const form of toSave) {
-                const plafond = plafonds.find((p) => p.id === form.plafondId);
-                if (!plafond) continue;
-
-                await transactionsApi.create({
-                    provinceId: plafond.provinceId,
-                    compteCode: plafond.compteCode,
-                    montant: Number(form.montant),
-                    factureNumero: form.factureNumero || undefined,
-                    factureDate: form.factureDate || undefined,
-                    fournisseur: form.fournisseur || undefined,
-                    adresseFournisseur: form.adresseFournisseur || undefined,
-                    numeroAp: form.numeroAp || undefined,
-                    dateAp: form.dateAp || undefined,
-                    moisAnnee: form.moisAnnee || undefined,
-                    description: `Depense ${plafond.libelle}`,
-                });
+            const plafond = plafonds.find((p) => p.id === activeEditingPlafondId);
+            if (!plafond) {
+                setError("Plafond introuvable.");
+                return;
             }
 
-            setSuccess(`${toSave.length} depense(s) enregistree(s) avec succes.`);
+            await transactionsApi.create({
+                provinceId: plafond.provinceId,
+                compteCode: plafond.compteCode,
+                montant: Number(form.montant),
+                factureNumero: form.factureNumero || undefined,
+                factureDate: form.factureDate || undefined,
+                fournisseur: form.fournisseur || undefined,
+                adresseFournisseur: form.adresseFournisseur || undefined,
+                numeroAp: form.numeroAp || undefined,
+                dateAp: form.dateAp || undefined,
+                moisAnnee: form.moisAnnee || undefined,
+                description: `Depense ${plafond.libelle}`,
+            });
+
+            setSuccess("Depense enregistree avec succes.");
+
+            // Reset the active row
+            clearActiveRow();
+
             await fetchPlafonds(); // Refresh data
         } catch (err) {
             setError(
@@ -701,7 +749,7 @@ export default function DashboardPage() {
                         ) : (
                             <div className="max-h-[500px] overflow-auto">
                                 <table className="w-full min-w-[1400px] border-separate border-spacing-0 text-sm">
-                                    <thead>
+                                    <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                                     <tr className="bg-gradient-to-r from-[#0A1A44] to-[#1A3A8A]">
                                         <th className="h-12 border-r border-white/10 px-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white">
                                             Code
@@ -745,12 +793,15 @@ export default function DashboardPage() {
                                         // A Alimenter = Facture - Encaissement (when positive)
                                         const aAlimenter = factureTotal - p.plafondEncaissement;
 
+                                        // Check if this row is disabled (another row is being edited)
+                                        const isRowDisabled = activeEditingPlafondId !== null && activeEditingPlafondId !== p.id;
+
                                         return (
                                             <tr
                                                 key={p.id}
                                                 className={`border-b border-border/60 ${
                                                     i % 2 === 0 ? "bg-white" : "bg-secondary/20"
-                                                }`}
+                                                } ${isRowDisabled ? "opacity-50" : ""} ${activeEditingPlafondId === p.id ? "bg-blue-50/50" : ""}`}
                                             >
                                                 {/* Code */}
                                                 <td className="h-auto px-4 py-3 align-top font-mono text-sm font-medium text-foreground">
@@ -788,6 +839,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "factureNumero", e.target.value)
                                                         }
+                                                        disabled={isRowDisabled}
                                                         className="h-9 w-20 text-sm"
                                                     />
                                                 </td>
@@ -800,6 +852,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "factureDate", e.target.value)
                                                         }
+                                                        disabled={isRowDisabled}
                                                         className="h-9 w-36 text-sm"
                                                     />
                                                 </td>
@@ -812,6 +865,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "fournisseur", e.target.value)
                                                         }
+                                                        disabled={isRowDisabled}
                                                         className="h-9 w-28 text-sm"
                                                     />
                                                 </td>
@@ -828,6 +882,7 @@ export default function DashboardPage() {
                                                                 e.target.value
                                                             )
                                                         }
+                                                        disabled={isRowDisabled}
                                                         className="h-9 w-32 text-sm"
                                                     />
                                                 </td>
@@ -840,6 +895,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "numeroAp", e.target.value)
                                                         }
+                                                        disabled={isRowDisabled}
                                                         className="h-9 w-20 text-sm"
                                                     />
                                                 </td>
@@ -855,6 +911,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "montant", e.target.value)
                                                         }
+                                                        disabled={isRowDisabled}
                                                         className="h-9 w-28 text-right text-sm"
                                                     />
                                                 </td>
@@ -868,10 +925,19 @@ export default function DashboardPage() {
 
                         {/* Save Button - Hidden for VIEW_REGION */}
                         {user?.role !== "VIEW_REGION" && (
-                            <div className="flex justify-end border-t border-border/60 px-6 py-4">
+                            <div className="flex justify-end gap-3 border-t border-border/60 px-6 py-4">
+                                {activeEditingPlafondId !== null && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={clearActiveRow}
+                                        disabled={submitting}
+                                    >
+                                        Annuler
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={handleSaveAll}
-                                    disabled={submitting}
+                                    disabled={submitting || activeEditingPlafondId === null}
                                     className="bg-[#059669] text-white hover:bg-[#047857]"
                                 >
                                     {submitting ? (
@@ -879,7 +945,7 @@ export default function DashboardPage() {
                                     ) : (
                                         <Save className="mr-2 h-4 w-4" />
                                     )}
-                                    Enregistrer les Depenses Saisies
+                                    Enregistrer la Depense
                                 </Button>
                             </div>
                         )}
@@ -1432,7 +1498,11 @@ export default function DashboardPage() {
                                         type="date"
                                         value={editForm.factureDate}
                                         onChange={(e) =>
-                                            setEditForm((f) => ({ ...f, factureDate: e.target.value }))
+                                            setEditForm((f) => ({
+                                                ...f,
+                                                factureDate: e.target.value,
+                                                dateAp: e.target.value // Auto-sync dateAp with factureDate
+                                            }))
                                         }
                                         className="h-11"
                                     />
@@ -1440,32 +1510,17 @@ export default function DashboardPage() {
                             </div>
 
                             {/* AP */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                                        Numero AP
-                                    </label>
-                                    <Input
-                                        value={editForm.numeroAp}
-                                        onChange={(e) =>
-                                            setEditForm((f) => ({ ...f, numeroAp: e.target.value }))
-                                        }
-                                        className="h-11"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                                        Date AP
-                                    </label>
-                                    <Input
-                                        type="date"
-                                        value={editForm.dateAp}
-                                        onChange={(e) =>
-                                            setEditForm((f) => ({ ...f, dateAp: e.target.value }))
-                                        }
-                                        className="h-11"
-                                    />
-                                </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                                    Numero AP
+                                </label>
+                                <Input
+                                    value={editForm.numeroAp}
+                                    onChange={(e) =>
+                                        setEditForm((f) => ({ ...f, numeroAp: e.target.value }))
+                                    }
+                                    className="h-11"
+                                />
                             </div>
 
                             {/* Buttons */}
