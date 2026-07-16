@@ -31,6 +31,12 @@ const navItems: NavItem[] = [
     roles: ["ADMIN", "ADMIN_VIEW", "REGION", "PROV", "BUDGET", "VIEW_REGION"],
   },
   {
+    label: "Situation",
+    href: "/dashboard/situation",
+    icon: FileText,
+    roles: ["ADMIN", "ADMIN_VIEW", "REGION", "PROV", "VIEW_REGION"],
+  },
+  {
     label: "Gestion Plafonds",
     href: "/dashboard/plafonds",
     icon: Settings,
