@@ -1,19 +1,9 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export interface SituationRow {
-    key: string;
-    dr: string;
-    dp: string;
-    compteCode: string;
-    plafondGlobal: number; // (I)
-    avance: number; // (II)
-    disponibleRubrique: number; // (III = I - II)
-    disponibleEncaisse: number;
-    depenses: number; // (IV)
-    versement: number;
-    solde: number; // (V = II - IV)
-}
+import type { SituationRow } from "@/lib/types";
+
+export type { SituationRow };
 
 export const SITUATION_HEADERS = [
     "DR",
@@ -25,7 +15,7 @@ export const SITUATION_HEADERS = [
     "Disponible Encaisse",
     "Total des Dépenses (IV)",
     "Versement",
-    "Solde (V=II-IV)",
+    "Solde (V=II-IV-Versement)",
 ];
 
 export function computeTotals(rows: SituationRow[]) {
@@ -54,7 +44,7 @@ function formatDateFr(iso: string) {
     return y && m && d ? `${d}/${m}/${y}` : "";
 }
 
-function numbers(r: Omit<SituationRow, "key" | "dr" | "dp" | "compteCode">) {
+function numbers(r: Pick<SituationRow, "plafondGlobal" | "avance" | "disponibleRubrique" | "disponibleEncaisse" | "depenses" | "versement" | "solde">) {
     return [
         r.plafondGlobal,
         r.avance,

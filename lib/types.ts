@@ -129,3 +129,48 @@ export interface UserUpdateRequest {
   regionId?: number | null;
   provinceId?: number | null;
 }
+
+export interface SituationRow {
+  plafondId: number;
+  provinceId: number;
+  dp: string;
+  regionId: number;
+  dr: string;
+  compteCode: string;
+  libelle: string;
+  plafondGlobal: number; // (I)
+  avance: number; // (II)
+  disponibleRubrique: number; // (III = I - II)
+  disponibleEncaisse: number;
+  depenses: number; // (IV)
+  versement: number;
+  solde: number; // (V = II - IV - versement)
+}
+
+export interface SituationResponse {
+  exercice: number;
+  arreteAu: string;
+  rows: SituationRow[];
+  totals: Omit<SituationRow, "plafondId" | "provinceId" | "dp" | "regionId" | "dr" | "compteCode" | "libelle">;
+}
+
+export interface Versement {
+  id: number;
+  plafondId: number;
+  provinceId: number;
+  provinceName: string;
+  compteCode: string;
+  montant: number;
+  dateVersement: string;
+  reference: string | null;
+  commentaire: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface VersementRequest {
+  montant: number;
+  dateVersement?: string;
+  reference?: string;
+  commentaire?: string;
+}

@@ -4,31 +4,34 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
-    plafondsApi,
+    ApiError,
     provincesApi,
     regionsApi,
-    transactionsApi,
+    situationApi,
+    versementsApi,
 } from "@/lib/api";
-import type {
-    PlafondRegie,
-    Province,
-    Region,
-    TransactionRegie,
-} from "@/lib/types";
+import type { Province, Region, SituationRow } from "@/lib/types";
 import {
     SITUATION_HEADERS,
     computeTotals,
     exportSituationExcel,
     exportSituationPdf,
-    type SituationRow,
 } from "@/lib/situation-export";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import {
     AlertCircle,
     FileSpreadsheet,
     FileText,
+    HandCoins,
     Loader2,
     RefreshCw,
     Search,
@@ -36,6 +39,7 @@ import {
 } from "lucide-react";
 
 const ALLOWED_ROLES = ["ADMIN", "ADMIN_VIEW", "REGION", "PROV", "VIEW_REGION"];
+const VERSEMENT_ROLES = ["ADMIN", "REGION", "PROV"];
 
 function formatNumber(value: number) {
     return new Intl.NumberFormat("fr-FR", {
@@ -53,8 +57,7 @@ export default function SituationPage() {
     const { user } = useAuth();
     const router = useRouter();
 
-    const [plafonds, setPlafonds] = useState<PlafondRegie[]>([]);
-    const [transactions, setTransactions] = useState<TransactionRegie[]>([]);
+    const [rows, setRows] = useState<SituationRow[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [regions, setRegions] = useState<Region[]>([]);
     const [loading, setLoading] = useState(true);
@@ -67,6 +70,17 @@ export default function SituationPage() {
     const [filterProvince, setFilterProvince] = useState("");
     const [search, setSearch] = useState("");
 
+    // Versement modal
+    const [versementModal, setVersementModal] = useState<SituationRow | null>(null);
+    const [versementForm, setVersementForm] = useState({
+        montant: "",
+        dateVersement: today(),
+        reference: "",
+        commentaire: "",
+    });
+    const [versementSubmitting, setVersementSubmitting] = useState(false);
+    const [versementError, setVersementError] = useState("");
+
     useEffect(() => {
         if (user && !ALLOWED_ROLES.includes(user.role)) {
             router.push("/dashboard");
@@ -77,76 +91,69 @@ export default function SituationPage() {
         setLoading(true);
         setError("");
         try {
-            const [plafondsData, transactionsData, provincesData, regionsData] =
-                await Promise.all([
-                    plafondsApi.getAll(),
-                    transactionsApi.getAll(),
-                    provincesApi.getAll(),
-                    regionsApi.getAll(),
-                ]);
-            setPlafonds(plafondsData);
-            setTransactions(transactionsData);
+            // Le backend ne renvoie que les régies visibles par l'utilisateur connecté
+            const [situation, provincesData, regionsData] = await Promise.all([
+                situationApi.get(exercice, arreteAu || undefined),
+                provincesApi.getAll(),
+                regionsApi.getAll(),
+            ]);
+            setRows(situation.rows);
             setProvinces(provincesData);
             setRegions(regionsData);
-
-            if (user?.role === "PROV" && user.provinceId) {
-                const prov = provincesData.find((p) => p.id === user.provinceId);
-                if (prov) setFilterRegion(String(prov.regionId));
-                setFilterProvince(String(user.provinceId));
-            } else if (
-                (user?.role === "REGION" || user?.role === "VIEW_REGION") &&
-                user.regionId
-            ) {
-                setFilterRegion(String(user.regionId));
-            }
         } catch {
             setError("Erreur lors du chargement de la situation.");
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [exercice, arreteAu]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
-    // Une ligne par rubrique de régie (province + compte), comme dans l'état Excel.
-    const rows = useMemo<(SituationRow & { regionId: number | null; provinceId: number })[]>(() => {
-        const provinceById = new Map(provinces.map((p) => [p.id, p]));
-
-        // Dépenses confirmées de l'exercice, jusqu'à la date d'arrêté
-        const depenses = new Map<string, number>();
-        for (const t of transactions) {
-            if (t.statut !== "CONFIRMEE") continue;
-            const date = (t.dateTransaction || "").slice(0, 10);
-            if (!date || date.slice(0, 4) !== String(exercice)) continue;
-            if (arreteAu && date > arreteAu) continue;
-            const key = `${t.provinceId}|${t.compteCode}`;
-            depenses.set(key, (depenses.get(key) ?? 0) + (t.montantValide ?? 0));
+    // Pré-sélection des filtres selon le rôle
+    useEffect(() => {
+        if (!user || provinces.length === 0) return;
+        if (user.role === "PROV" && user.provinceId) {
+            const prov = provinces.find((p) => p.id === user.provinceId);
+            if (prov) setFilterRegion(String(prov.regionId));
+            setFilterProvince(String(user.provinceId));
+        } else if (
+            (user.role === "REGION" || user.role === "VIEW_REGION") &&
+            user.regionId
+        ) {
+            setFilterRegion(String(user.regionId));
         }
+    }, [user, provinces]);
 
-        return plafonds.map((p) => {
-            const prov = provinceById.get(p.provinceId);
-            const plafondGlobal = p.budgetAnnuelInitial || p.plafondAnnuel;
-            const avance = plafondGlobal - p.plafondAnnuel;
-            const dep = depenses.get(`${p.provinceId}|${p.compteCode}`) ?? 0;
-            return {
-                key: String(p.id),
-                provinceId: p.provinceId,
-                regionId: prov?.regionId ?? null,
-                dr: prov?.regionName ?? "-",
-                dp: p.provinceName,
-                compteCode: p.compteCode,
-                plafondGlobal,
-                avance,
-                disponibleRubrique: p.plafondAnnuel,
-                disponibleEncaisse: p.plafondEncaissement,
-                depenses: dep,
-                versement: 0,
-                solde: avance - dep,
-            };
-        });
-    }, [plafonds, transactions, provinces, exercice, arreteAu]);
+    const openVersement = (row: SituationRow) => {
+        setVersementModal(row);
+        setVersementForm({ montant: "", dateVersement: today(), reference: "", commentaire: "" });
+        setVersementError("");
+    };
+
+    const submitVersement = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!versementModal) return;
+        setVersementSubmitting(true);
+        setVersementError("");
+        try {
+            await versementsApi.create(versementModal.plafondId, {
+                montant: Number(versementForm.montant),
+                dateVersement: versementForm.dateVersement || undefined,
+                reference: versementForm.reference || undefined,
+                commentaire: versementForm.commentaire || undefined,
+            });
+            setVersementModal(null);
+            await fetchData();
+        } catch (err) {
+            setVersementError(
+                err instanceof ApiError ? err.message : "Erreur lors de l'enregistrement du versement."
+            );
+        } finally {
+            setVersementSubmitting(false);
+        }
+    };
 
     const filteredRows = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -165,6 +172,7 @@ export default function SituationPage() {
 
     const totals = useMemo(() => computeTotals(filteredRows), [filteredRows]);
 
+    const canVersement = !!user && VERSEMENT_ROLES.includes(user.role);
     const isProv = user?.role === "PROV";
     const isRegionScoped = user?.role === "REGION" || user?.role === "VIEW_REGION";
     const availableProvinces = provinces.filter(
@@ -341,11 +349,12 @@ export default function SituationPage() {
                                                 {h}
                                             </th>
                                         ))}
+                                        {canVersement && <th className="border border-border px-3 py-2" />}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredRows.map((r) => (
-                                        <tr key={r.key} className="hover:bg-muted/40">
+                                        <tr key={r.plafondId} className="hover:bg-muted/40">
                                             <td className="border border-border px-3 py-2 italic">{r.dr}</td>
                                             <td className="border border-border px-3 py-2 font-semibold">{r.dp}</td>
                                             <td className="border border-border px-3 py-2 font-semibold whitespace-nowrap">{r.compteCode}</td>
@@ -356,6 +365,18 @@ export default function SituationPage() {
                                             <td className={`border border-border bg-fuchsia-200 dark:bg-fuchsia-900/40 ${numCell}`}>{formatNumber(r.depenses)}</td>
                                             <td className={`border border-border ${numCell}`}>{formatNumber(r.versement)}</td>
                                             <td className={`border border-border font-bold ${numCell}`}>{formatNumber(r.solde)}</td>
+                                            {canVersement && (
+                                                <td className="border border-border px-2 py-1 text-center">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        title="Enregistrer un versement"
+                                                        onClick={() => openVersement(r)}
+                                                    >
+                                                        <HandCoins className="h-4 w-4" />
+                                                    </Button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -371,6 +392,7 @@ export default function SituationPage() {
                                         <td className={`border border-border ${numCell}`}>{formatNumber(totals.depenses)}</td>
                                         <td className={`border border-border ${numCell}`}>{formatNumber(totals.versement)}</td>
                                         <td className={`border border-border ${numCell}`}>{formatNumber(totals.solde)}</td>
+                                        {canVersement && <td className="border border-border" />}
                                     </tr>
                                 </tfoot>
                             </table>
@@ -378,6 +400,75 @@ export default function SituationPage() {
                     )}
                 </CardContent>
             </Card>
+            <Dialog open={!!versementModal} onOpenChange={(open) => !open && setVersementModal(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Enregistrer un versement</DialogTitle>
+                    </DialogHeader>
+                    {versementModal && (
+                        <form onSubmit={submitVersement} className="flex flex-col gap-4">
+                            <p className="text-sm text-muted-foreground">
+                                {versementModal.dp} — compte{" "}
+                                <span className="font-mono">{versementModal.compteCode}</span>
+                                <br />
+                                Encaissement disponible:{" "}
+                                <strong>{formatNumber(versementModal.disponibleEncaisse)} DH</strong>
+                            </p>
+                            {versementError && (
+                                <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                    {versementError}
+                                </div>
+                            )}
+                            <div className="flex flex-col gap-2">
+                                <Label className="text-xs font-semibold">Montant du versement (DH) *</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    max={versementModal.disponibleEncaisse}
+                                    required
+                                    value={versementForm.montant}
+                                    onChange={(e) => setVersementForm({ ...versementForm, montant: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label className="text-xs font-semibold">Date du versement</Label>
+                                <Input
+                                    type="date"
+                                    value={versementForm.dateVersement}
+                                    onChange={(e) => setVersementForm({ ...versementForm, dateVersement: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label className="text-xs font-semibold">Référence (reçu, virement...)</Label>
+                                <Input
+                                    maxLength={100}
+                                    value={versementForm.reference}
+                                    onChange={(e) => setVersementForm({ ...versementForm, reference: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label className="text-xs font-semibold">Commentaire</Label>
+                                <Input
+                                    maxLength={500}
+                                    value={versementForm.commentaire}
+                                    onChange={(e) => setVersementForm({ ...versementForm, commentaire: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button type="button" variant="outline" onClick={() => setVersementModal(null)}>
+                                    Annuler
+                                </Button>
+                                <Button type="submit" disabled={versementSubmitting || !versementForm.montant}>
+                                    {versementSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Enregistrer
+                                </Button>
+                            </div>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
