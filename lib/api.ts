@@ -116,6 +116,9 @@ import type {
   HistoriqueAlimentation,
   AlimentationRequest,
   UserUpdateRequest,
+  SituationResponse,
+  Versement,
+  VersementRequest,
 } from "@/lib/types";
 
 // ========================
@@ -228,6 +231,31 @@ export const historiqueApi = {
       apiRequest<HistoriqueAlimentation[]>(`/historique/province/${provinceId}`),
   getByRegion: (regionId: number) =>
       apiRequest<HistoriqueAlimentation[]>(`/historique/region/${regionId}`),
+};
+
+// ========================
+// Situation des regies API
+// ========================
+export const situationApi = {
+  get: (exercice?: number, arreteAu?: string) => {
+    const params = new URLSearchParams();
+    if (exercice) params.set("exercice", String(exercice));
+    if (arreteAu) params.set("arreteAu", arreteAu);
+    const qs = params.toString();
+    return apiRequest<SituationResponse>(`/situation${qs ? `?${qs}` : ""}`);
+  },
+};
+
+// ========================
+// Versements API
+// ========================
+export const versementsApi = {
+  getAll: (plafondId?: number) =>
+      apiRequest<Versement[]>(`/versements${plafondId ? `?plafondId=${plafondId}` : ""}`),
+  create: (plafondId: number, data: VersementRequest) =>
+      apiRequest<Versement>(`/versements/plafond/${plafondId}`, { method: "POST", body: data }),
+  delete: (id: number) =>
+      apiRequest<void>(`/versements/${id}`, { method: "DELETE" }),
 };
 
 // ========================
