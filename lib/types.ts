@@ -30,6 +30,8 @@ export interface PlafondRegie {
   budgetAnnuelInitial: number | null;
   plafondEncaissement: number;
   plafondMaxFacture: number;
+  exercice?: number;
+  cloture?: boolean;
 }
 
 export interface TransactionRegie {
@@ -56,36 +58,69 @@ export interface TransactionRegie {
   dateTransaction: string;
   createdBy: string;
   createdAt: string;
+  exercice?: number;
+  cloture?: boolean;
 }
 
-export interface HistoriqueAlimentation {
+/** One entry of the journal: every operation, with before/after details. */
+export interface JournalEntry {
   id: number;
-  plafondId: number;
-  compteCode: string;
-  libelle: string;
-  provinceId: number;
-  provinceName: string;
-  regionId: number;
-  regionName: string;
-  montantAlimentation: number;
-  ancienDisponible: number;
-  nouveauDisponible: number;
-  ancienAvance: number;
-  nouveauAvance: number;
+  entite: string; // PLAFOND | TRANSACTION | VERSEMENT | EXERCICE | UTILISATEUR | REGION | PROVINCE
+  action: string;
+  entiteId: number | null;
+  exercice: number | null;
+  provinceId: number | null;
+  provinceName: string | null;
+  regionId: number | null;
+  regionName: string | null;
+  plafondId: number | null;
+  compteCode: string | null;
+  libelle: string | null;
+  montant: number | null;
   ancienEncaissement: number | null;
   nouveauEncaissement: number | null;
-  ancienPlafondFixe: number | null;
-  nouveauPlafondFixe: number | null;
   ancienPlafondAnnuel: number | null;
   nouveauPlafondAnnuel: number | null;
-  typeOperation: string | null;
   op: string | null;
   dateOp: string | null;
   numCheque: string | null;
   dateCheque: string | null;
   commentaire: string | null;
+  details: string | null; // JSON: [{champ, avant, apres}]
   createdBy: string;
   createdAt: string;
+}
+
+export interface JournalDetail {
+  champ: string;
+  avant: string | null;
+  apres: string | null;
+}
+
+export type HistoriqueAlimentation = JournalEntry;
+
+export interface ProvinceExercice {
+  provinceId: number;
+  provinceName: string;
+  regionId: number | null;
+  exerciceCourant: number;
+  clotures: { annee: number; cloturePar: string; clotureLe: string }[];
+}
+
+export interface ExerciceInfo {
+  exerciceCourant: number;
+  annees: number[];
+  peutConsulterClotures: boolean;
+  peutCloturer: boolean;
+  provinces: ProvinceExercice[];
+}
+
+export interface CloturePrecheck {
+  provinceId: number;
+  provinceName: string;
+  annee: number;
+  cloturable: boolean;
+  blocages: string[];
 }
 
 export interface PlafondRegieRequest {
@@ -145,13 +180,14 @@ export interface SituationRow {
   depenses: number; // (IV)
   versement: number;
   solde: number; // (V = II - IV - versement)
+  cloture?: boolean;
 }
 
 export interface SituationResponse {
   exercice: number;
   arreteAu: string;
   rows: SituationRow[];
-  totals: Omit<SituationRow, "plafondId" | "provinceId" | "dp" | "regionId" | "dr" | "compteCode" | "libelle">;
+  totals: Omit<SituationRow, "plafondId" | "provinceId" | "dp" | "regionId" | "dr" | "compteCode" | "libelle" | "cloture">;
 }
 
 export interface Versement {
@@ -166,6 +202,9 @@ export interface Versement {
   commentaire: string | null;
   createdBy: string;
   createdAt: string;
+  type: "VERSEMENT" | "ANNULATION";
+  exercice?: number;
+  cloture?: boolean;
 }
 
 export interface VersementRequest {
@@ -173,4 +212,5 @@ export interface VersementRequest {
   dateVersement?: string;
   reference?: string;
   commentaire?: string;
+  type?: "VERSEMENT" | "ANNULATION";
 }

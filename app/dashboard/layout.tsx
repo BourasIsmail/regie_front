@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { DashboardTopbar } from "@/components/dashboard-topbar";
+import { ExerciceProvider } from "@/lib/exercice-context";
+import { ExerciceBar } from "@/components/exercice-bar";
 
 export default function DashboardLayout({
                                             children,
@@ -35,9 +37,11 @@ export default function DashboardLayout({
     if (!isAuthenticated) return null;
 
     return (
+        <ExerciceProvider>
         <div className="flex min-h-screen flex-col bg-background">
             <DashboardTopbar />
             <main className="mx-auto mt-[70px] w-full max-w-[1600px] flex-1 animate-in fade-in slide-in-from-bottom-5 p-8 duration-400">
+                <ExerciceBar />
                 {children}
             </main>
             <footer className="border-t border-border bg-muted/30 py-4 text-center">
@@ -46,5 +50,6 @@ export default function DashboardLayout({
                 </p>
             </footer>
         </div>
+        </ExerciceProvider>
     );
 }

@@ -3,6 +3,7 @@
 import React from "react";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useExercice } from "@/lib/exercice-context";
 import {
     plafondsApi,
     transactionsApi,
@@ -79,6 +80,7 @@ interface InlineTransaction {
 
 export default function DashboardPage() {
     const { user } = useAuth();
+    const { exercice, ready: exerciceReady, isEditableFor } = useExercice();
     const [regions, setRegions] = useState<Region[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [plafonds, setPlafonds] = useState<PlafondRegie[]>([]);
@@ -165,6 +167,7 @@ export default function DashboardPage() {
     }, [user]);
 
     const fetchPlafonds = useCallback(async () => {
+        if (!exerciceReady) return;
         if (!selectedProvince) {
             setPlafonds([]);
             setTransactions([]);
@@ -175,8 +178,8 @@ export default function DashboardPage() {
         setSuccess("");
         try {
             const [plafondsData, transactionsData] = await Promise.all([
-                plafondsApi.getAll(),
-                transactionsApi.getAll(),
+                plafondsApi.getAll(exercice),
+                transactionsApi.getAll(exercice),
             ]);
             // Filter by selected province
             const filtered = plafondsData.filter(
@@ -209,7 +212,10 @@ export default function DashboardPage() {
         } finally {
             setLoadingPlafonds(false);
         }
-    }, [selectedProvince]);
+    }, [selectedProvince, exercice, exerciceReady]);
+
+    // Données de l'exercice sélectionné modifiables (exercice courant de la province, non clôturé)
+    const editable = isEditableFor(selectedProvince === "" ? null : selectedProvince);
 
     useEffect(() => {
         fetchInitialData();
@@ -385,8 +391,8 @@ export default function DashboardPage() {
             setSuccess("Depense supprimee avec succes. Le montant a ete restitue.");
             // Refresh plafonds and remove the deleted transaction from state
             const [plafondsData, transactionsData] = await Promise.all([
-                plafondsApi.getAll(),
-                transactionsApi.getAll(),
+                plafondsApi.getAll(exercice),
+                transactionsApi.getAll(exercice),
             ]);
             if (selectedProvince) {
                 setPlafonds(plafondsData.filter((p) => p.provinceId === selectedProvince));
@@ -839,7 +845,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "factureNumero", e.target.value)
                                                         }
-                                                        disabled={isRowDisabled}
+                                                        disabled={isRowDisabled || !editable}
                                                         className="h-9 w-20 text-sm"
                                                     />
                                                 </td>
@@ -852,7 +858,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "factureDate", e.target.value)
                                                         }
-                                                        disabled={isRowDisabled}
+                                                        disabled={isRowDisabled || !editable}
                                                         className="h-9 w-36 text-sm"
                                                     />
                                                 </td>
@@ -865,7 +871,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "fournisseur", e.target.value)
                                                         }
-                                                        disabled={isRowDisabled}
+                                                        disabled={isRowDisabled || !editable}
                                                         className="h-9 w-28 text-sm"
                                                     />
                                                 </td>
@@ -882,7 +888,7 @@ export default function DashboardPage() {
                                                                 e.target.value
                                                             )
                                                         }
-                                                        disabled={isRowDisabled}
+                                                        disabled={isRowDisabled || !editable}
                                                         className="h-9 w-32 text-sm"
                                                     />
                                                 </td>
@@ -895,7 +901,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "numeroAp", e.target.value)
                                                         }
-                                                        disabled={isRowDisabled}
+                                                        disabled={isRowDisabled || !editable}
                                                         className="h-9 w-20 text-sm"
                                                     />
                                                 </td>
@@ -911,7 +917,7 @@ export default function DashboardPage() {
                                                         onChange={(e) =>
                                                             handleInlineChange(p.id, "montant", e.target.value)
                                                         }
-                                                        disabled={isRowDisabled}
+                                                        disabled={isRowDisabled || !editable}
                                                         className="h-9 w-28 text-right text-sm"
                                                     />
                                                 </td>
@@ -924,7 +930,7 @@ export default function DashboardPage() {
                         )}
 
                         {/* Save Button - Hidden for VIEW_REGION and ADMIN_VIEW (read-only) */}
-                        {user?.role !== "VIEW_REGION" && user?.role !== "ADMIN_VIEW" && (
+                        {editable && user?.role !== "VIEW_REGION" && user?.role !== "ADMIN_VIEW" && (
                             <div className="flex justify-end gap-3 border-t border-border/60 px-6 py-4">
                                 {activeEditingPlafondId !== null && (
                                     <Button
@@ -1098,7 +1104,7 @@ export default function DashboardPage() {
                                             <td className="h-14 px-4">
                                                 <div className="flex items-center justify-center gap-1">
                                                     {/* Confirm/Reject buttons for REGION or ADMIN role on pending transactions */}
-                                                    {(user?.role === "REGION" || user?.role === "ADMIN") && tx.statut === "EN_ATTENTE" && (
+                                                    {editable && !tx.cloture && (user?.role === "REGION" || user?.role === "ADMIN") && tx.statut === "EN_ATTENTE" && (
                                                         <>
                                                             <Button
                                                                 size="sm"
@@ -1121,7 +1127,7 @@ export default function DashboardPage() {
                                                         </>
                                                     )}
                                                     {/* Edit button for all roles except VIEW_REGION and ADMIN_VIEW on pending transactions */}
-                                                    {tx.statut === "EN_ATTENTE" && user?.role !== "VIEW_REGION" && user?.role !== "ADMIN_VIEW" && (
+                                                    {editable && !tx.cloture && tx.statut === "EN_ATTENTE" && user?.role !== "VIEW_REGION" && user?.role !== "ADMIN_VIEW" && (
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
@@ -1133,7 +1139,7 @@ export default function DashboardPage() {
                                                         </Button>
                                                     )}
                                                     {/* Delete button - for ADMIN (all statuses) and REGION (pending only), not ADMIN_VIEW */}
-                                                    {(user?.role === "ADMIN" || (user?.role === "REGION" && tx.statut === "EN_ATTENTE")) && (
+                                                    {editable && !tx.cloture && (user?.role === "ADMIN" || (user?.role === "REGION" && tx.statut === "EN_ATTENTE")) && (
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"

@@ -14,8 +14,8 @@ export const SITUATION_HEADERS = [
     "Disponible Par Rubrique (III=I-II)",
     "Disponible Encaisse",
     "Total des Dépenses (IV)",
-    "Versement",
-    "Solde (V=II-IV-Versement)",
+    "Versement/Annulation",
+    "Solde (V=II-IV-Versement/Annulation)",
 ];
 
 export function computeTotals(rows: SituationRow[]) {

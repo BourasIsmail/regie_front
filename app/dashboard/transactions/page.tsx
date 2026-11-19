@@ -5,6 +5,7 @@ import React from "react";
 import { useEffect, useState, useCallback } from "react";
 import { transactionsApi, plafondsApi, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useExercice } from "@/lib/exercice-context";
 import type { TransactionRegie, PlafondRegie } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ const emptyForm = {
 
 export default function TransactionsPage() {
   const { user } = useAuth();
+  const { exercice, ready: exerciceReady, readOnly: exerciceReadOnly } = useExercice();
   const [transactions, setTransactions] = useState<TransactionRegie[]>([]);
   const [plafonds, setPlafonds] = useState<PlafondRegie[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,11 +80,12 @@ export default function TransactionsPage() {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (!exerciceReady) return;
     setLoading(true);
     try {
       const [txData, plafData] = await Promise.all([
-        transactionsApi.getAll(),
-        plafondsApi.getAll(),
+        transactionsApi.getAll(exercice),
+        plafondsApi.getAll(exercice),
       ]);
       setTransactions(txData);
       setPlafonds(plafData);
@@ -91,7 +94,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [exercice, exerciceReady]);
 
   useEffect(() => {
     fetchData();
@@ -171,13 +174,16 @@ export default function TransactionsPage() {
     (p) => p.provinceId === form.provinceId,
   );
 
+  const searchLower = searchTerm.trim().toLowerCase();
   const filtered = transactions.filter(
     (tx) =>
-      tx.provinceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.compteCode.includes(searchTerm) ||
-      (tx.fournisseur || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (tx.factureNumero || "").includes(searchTerm) ||
-      (tx.description || "").toLowerCase().includes(searchTerm.toLowerCase()),
+      !searchLower ||
+      tx.provinceName.toLowerCase().includes(searchLower) ||
+      tx.compteCode.toLowerCase().includes(searchLower) ||
+      (tx.fournisseur || "").toLowerCase().includes(searchLower) ||
+      (tx.factureNumero || "").toLowerCase().includes(searchLower) ||
+      (tx.numeroAp || "").toLowerCase().includes(searchLower) ||
+      (tx.description || "").toLowerCase().includes(searchLower),
   );
 
   // Generate mois/annee options (12 months)
@@ -213,6 +219,7 @@ export default function TransactionsPage() {
             Saisie et suivi des depenses par province
           </p>
         </div>
+        {!exerciceReadOnly && (
         <Button
           onClick={() => {
             setForm(emptyForm);
@@ -224,6 +231,7 @@ export default function TransactionsPage() {
           <Plus className="mr-2 h-4 w-4" />
           Nouvelle depense
         </Button>
+        )}
       </div>
 
       {error && (
@@ -582,7 +590,7 @@ export default function TransactionsPage() {
                               <ChevronDown className="h-4 w-4" />
                             )}
                           </Button>
-                          {(user?.role === "ADMIN" ||
+                          {!tx.cloture && (user?.role === "ADMIN" ||
                             user?.role === "REGION") && (
                             <>
                               <Button
