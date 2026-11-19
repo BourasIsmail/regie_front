@@ -129,6 +129,10 @@ export default function DashboardPage() {
     const [rejectModal, setRejectModal] = useState<TransactionRegie | null>(null);
     const [rejectMotif, setRejectMotif] = useState("");
 
+    // Filtre par compte de la liste des opérations (brouillon = sélection, appliqué = filtre actif)
+    const [compteDraft, setCompteDraft] = useState("");
+    const [compteApplied, setCompteApplied] = useState("");
+
     const [alimenterForm, setAlimenterForm] = useState({
         montant: "",
         op: "",
@@ -214,7 +218,15 @@ export default function DashboardPage() {
         }
     }, [selectedProvince, exercice, exerciceReady]);
 
+    useEffect(() => {
+        setCompteDraft("");
+        setCompteApplied("");
+    }, [selectedProvince, exercice]);
+
     // Données de l'exercice sélectionné modifiables (exercice courant de la province, non clôturé)
+    const visibleTransactions = compteApplied
+        ? transactions.filter((t) => t.compteCode === compteApplied)
+        : transactions;
     const editable = isEditableFor(selectedProvince === "" ? null : selectedProvince);
 
     useEffect(() => {
@@ -989,7 +1001,14 @@ export default function DashboardPage() {
                                     <label className="text-xs font-semibold text-muted-foreground">
                                         Filtrer par Compte
                                     </label>
-                                    <select className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                                    <select
+                                        className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                                        value={compteDraft}
+                                        onChange={(e) => {
+                                            setCompteDraft(e.target.value);
+                                            setCompteApplied(e.target.value);
+                                        }}
+                                    >
                                         <option value="">Tous les Comptes</option>
                                         {plafonds.map((p) => (
                                             <option key={p.compteCode} value={p.compteCode}>
@@ -999,13 +1018,23 @@ export default function DashboardPage() {
                                     </select>
                                 </div>
                                 <div className="flex items-end">
-                                    <Button className="w-full bg-[#0A1A44] text-white hover:bg-[#1A3A8A]">
+                                    <Button
+                                        className="w-full bg-[#0A1A44] text-white hover:bg-[#1A3A8A]"
+                                        onClick={() => setCompteApplied(compteDraft)}
+                                    >
                                         <Filter className="mr-2 h-4 w-4" />
                                         Appliquer Filtre
                                     </Button>
                                 </div>
                                 <div className="flex items-end">
-                                    <Button variant="outline" className="w-full">
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => {
+                                            setCompteDraft("");
+                                            setCompteApplied("");
+                                        }}
+                                    >
                                         <RefreshCw className="mr-2 h-4 w-4" />
                                         Reinitialiser
                                     </Button>
@@ -1014,7 +1043,7 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Transactions Table */}
-                        {transactions.length > 0 ? (
+                        {visibleTransactions.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[1200px] border-separate border-spacing-0 text-sm">
                                     <thead>
@@ -1058,7 +1087,7 @@ export default function DashboardPage() {
                                     </tr>
                                     </thead>
                                     <tbody>
-                                    {transactions.map((tx, i) => (
+                                    {visibleTransactions.map((tx, i) => (
                                         <tr
                                             key={tx.id}
                                             className={`border-b border-border/60 ${
@@ -1171,7 +1200,7 @@ export default function DashboardPage() {
                             <div className="flex flex-col items-center justify-center py-12">
                                 <List className="mb-4 h-10 w-10 text-muted-foreground/30" />
                                 <p className="text-sm text-muted-foreground">
-                                    Aucune transaction pour cette province
+                                    {compteApplied && transactions.length > 0 ? "Aucune opération pour ce compte" : "Aucune transaction pour cette province"}
                                 </p>
                             </div>
                         )}
