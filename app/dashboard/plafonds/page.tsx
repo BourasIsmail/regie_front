@@ -9,6 +9,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useExercice } from "@/lib/exercice-context";
 import type { PlafondRegie, Province, Region } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,7 @@ const emptyForm = {
 
 export default function PlafondsPage() {
   const { user } = useAuth();
+  const { exercice, ready: exerciceReady, readOnly: exerciceReadOnly } = useExercice();
   const [plafonds, setPlafonds] = useState<PlafondRegie[]>([]);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
@@ -91,10 +93,11 @@ export default function PlafondsPage() {
   const [correctionSubmitting, setCorrectionSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
+    if (!exerciceReady) return;
     setLoading(true);
     try {
       const [plafondsData, provincesData, regionsData] = await Promise.all([
-        plafondsApi.getAll(),
+        plafondsApi.getAll(exercice),
         provincesApi.getAll(),
         regionsApi.getAll(),
       ]);
@@ -119,7 +122,7 @@ export default function PlafondsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, exercice, exerciceReady]);
 
   useEffect(() => {
     fetchData();
@@ -241,7 +244,7 @@ export default function PlafondsPage() {
 
   const resetFilters = () => {
     // Only reset filters that user can change
-    if (user?.role === "ADMIN") {
+    if (user?.role === "ADMIN" || user?.role === "ADMIN_VIEW") {
       setFilterRegion("");
     }
     if (user?.role !== "PROV") {
@@ -299,7 +302,7 @@ export default function PlafondsPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {user?.role === "ADMIN" && (
+            {user?.role === "ADMIN" && !exerciceReadOnly && (
                 <Button
                     onClick={() => {
                       setForm(emptyForm);
@@ -501,7 +504,7 @@ export default function PlafondsPage() {
                         </td>
                         <td className="h-14 px-4">
                           <div className="flex items-center justify-end gap-1">
-                            {user?.role === "ADMIN" && (
+                            {user?.role === "ADMIN" && !p.cloture && (
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -512,7 +515,7 @@ export default function PlafondsPage() {
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                             )}
-                            {(user?.role === "ADMIN" || user?.role === "REGION") && (
+                            {(user?.role === "ADMIN" || user?.role === "REGION") && !p.cloture && (
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -523,7 +526,7 @@ export default function PlafondsPage() {
                                   Alimenter
                                 </Button>
                             )}
-                            {(user?.role === "ADMIN" || user?.role === "REGION") && (
+                            {(user?.role === "ADMIN" || user?.role === "REGION") && !p.cloture && (
                                 <Button
                                     size="sm"
                                     variant="outline"

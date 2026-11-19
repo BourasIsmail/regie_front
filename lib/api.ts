@@ -1,6 +1,7 @@
 import { getCookie, setCookie, removeCookie } from "@/lib/cookies";
 
-const API_BASE_URL =/*"http://localhost:8080/api"*//*"http://172.16.20.181:8080/api"*/"https://services.entraide.ma/api/api";
+const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_URL ?? "https://services.entraide.ma/api/api";
 
 interface ApiOptions {
   method?: string;
@@ -113,13 +114,17 @@ import type {
   PlafondRegieRequest,
   TransactionRegie,
   TransactionRegieRequest,
-  HistoriqueAlimentation,
+  JournalEntry,
+  ExerciceInfo,
+  CloturePrecheck,
   AlimentationRequest,
   UserUpdateRequest,
   SituationResponse,
   Versement,
   VersementRequest,
 } from "@/lib/types";
+
+const q = (exercice?: number) => (exercice ? `?exercice=${exercice}` : "");
 
 // ========================
 // Regions API (accessible by all authenticated users)
@@ -169,12 +174,12 @@ export const usersApi = {
 // Plafonds API
 // ========================
 export const plafondsApi = {
-  getAll: () => apiRequest<PlafondRegie[]>("/plafonds"),
+  getAll: (exercice?: number) => apiRequest<PlafondRegie[]>(`/plafonds${q(exercice)}`),
   getById: (id: number) => apiRequest<PlafondRegie>(`/plafonds/${id}`),
-  getByProvince: (provinceId: number) =>
-      apiRequest<PlafondRegie[]>(`/plafonds/province/${provinceId}`),
-  getByRegion: (regionId: number) =>
-      apiRequest<PlafondRegie[]>(`/plafonds/region/${regionId}`),
+  getByProvince: (provinceId: number, exercice?: number) =>
+      apiRequest<PlafondRegie[]>(`/plafonds/province/${provinceId}${q(exercice)}`),
+  getByRegion: (regionId: number, exercice?: number) =>
+      apiRequest<PlafondRegie[]>(`/plafonds/region/${regionId}${q(exercice)}`),
   create: (data: PlafondRegieRequest) =>
       apiRequest<PlafondRegie>("/plafonds", { method: "POST", body: data }),
   update: (id: number, data: PlafondRegieRequest) =>
@@ -196,12 +201,12 @@ export const plafondsApi = {
 // Transactions API
 // ========================
 export const transactionsApi = {
-  getAll: () => apiRequest<TransactionRegie[]>("/transactions"),
+  getAll: (exercice?: number) => apiRequest<TransactionRegie[]>(`/transactions${q(exercice)}`),
   getById: (id: number) => apiRequest<TransactionRegie>(`/transactions/${id}`),
-  getByProvince: (provinceId: number) =>
-      apiRequest<TransactionRegie[]>(`/transactions/province/${provinceId}`),
-  getByRegion: (regionId: number) =>
-      apiRequest<TransactionRegie[]>(`/transactions/region/${regionId}`),
+  getByProvince: (provinceId: number, exercice?: number) =>
+      apiRequest<TransactionRegie[]>(`/transactions/province/${provinceId}${q(exercice)}`),
+  getByRegion: (regionId: number, exercice?: number) =>
+      apiRequest<TransactionRegie[]>(`/transactions/region/${regionId}${q(exercice)}`),
   create: (data: TransactionRegieRequest) =>
       apiRequest<TransactionRegie>("/transactions", { method: "POST", body: data }),
   update: (id: number, data: TransactionRegieRequest) =>
@@ -223,14 +228,14 @@ export const transactionsApi = {
 // Historique Alimentations API
 // ========================
 export const historiqueApi = {
-  getAll: () => apiRequest<HistoriqueAlimentation[]>("/historique"),
-  getById: (id: number) => apiRequest<HistoriqueAlimentation>(`/historique/${id}`),
-  getByPlafond: (plafondId: number) =>
-      apiRequest<HistoriqueAlimentation[]>(`/historique/plafond/${plafondId}`),
-  getByProvince: (provinceId: number) =>
-      apiRequest<HistoriqueAlimentation[]>(`/historique/province/${provinceId}`),
-  getByRegion: (regionId: number) =>
-      apiRequest<HistoriqueAlimentation[]>(`/historique/region/${regionId}`),
+  getAll: (exercice?: number) => apiRequest<JournalEntry[]>(`/historique${q(exercice)}`),
+  getById: (id: number) => apiRequest<JournalEntry>(`/historique/${id}`),
+  getByPlafond: (plafondId: number, exercice?: number) =>
+      apiRequest<JournalEntry[]>(`/historique/plafond/${plafondId}${q(exercice)}`),
+  getByProvince: (provinceId: number, exercice?: number) =>
+      apiRequest<JournalEntry[]>(`/historique/province/${provinceId}${q(exercice)}`),
+  getByRegion: (regionId: number, exercice?: number) =>
+      apiRequest<JournalEntry[]>(`/historique/region/${regionId}${q(exercice)}`),
 };
 
 // ========================
@@ -250,12 +255,31 @@ export const situationApi = {
 // Versements API
 // ========================
 export const versementsApi = {
-  getAll: (plafondId?: number) =>
-      apiRequest<Versement[]>(`/versements${plafondId ? `?plafondId=${plafondId}` : ""}`),
+  getAll: (plafondId?: number, exercice?: number) => {
+    const params = new URLSearchParams();
+    if (plafondId) params.set("plafondId", String(plafondId));
+    if (exercice) params.set("exercice", String(exercice));
+    const qs = params.toString();
+    return apiRequest<Versement[]>(`/versements${qs ? `?${qs}` : ""}`);
+  },
   create: (plafondId: number, data: VersementRequest) =>
       apiRequest<Versement>(`/versements/plafond/${plafondId}`, { method: "POST", body: data }),
   delete: (id: number) =>
       apiRequest<void>(`/versements/${id}`, { method: "DELETE" }),
+};
+
+// ========================
+// Exercices API (selector + cloture)
+// ========================
+export const exercicesApi = {
+  info: () => apiRequest<ExerciceInfo>("/exercices"),
+  precheck: (provinceId: number, annee: number) =>
+      apiRequest<CloturePrecheck>(`/admin/exercices/precheck?provinceId=${provinceId}&annee=${annee}`),
+  cloturer: (provinceId: number, annee: number) =>
+      apiRequest<CloturePrecheck>("/admin/exercices/cloturer", {
+        method: "POST",
+        body: { provinceId, annee },
+      }),
 };
 
 // ========================

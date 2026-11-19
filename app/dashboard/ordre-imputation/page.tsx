@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useExercice } from "@/lib/exercice-context";
 import { regionsApi, transactionsApi, plafondsApi, provincesApi } from "@/lib/api";
 import type { Region, Province, PlafondRegie, TransactionRegie } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,7 @@ function formatDateFR(dateStr: string) {
 
 export default function OrdreImputationPage() {
   const { user } = useAuth();
+  const { exercice } = useExercice();
   const [regions, setRegions] = useState<Region[]>([]);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [selectedRegion, setSelectedRegion] = useState("");
@@ -182,6 +184,15 @@ export default function OrdreImputationPage() {
   const [periodeFin, setPeriodeFin] = useState(
       new Date().toISOString().split("T")[0]
   );
+
+  // La période suit l'exercice sélectionné
+  useEffect(() => {
+    const now = new Date();
+    setPeriodeDebut(`${exercice}-01-01`);
+    setPeriodeFin(
+        exercice === now.getFullYear() ? now.toISOString().split("T")[0] : `${exercice}-12-31`
+    );
+  }, [exercice]);
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -239,14 +250,14 @@ export default function OrdreImputationPage() {
       if (selectedProvince) {
         // Filter by province
         [transactions, plafonds] = await Promise.all([
-          transactionsApi.getByProvince(Number(selectedProvince)),
-          plafondsApi.getByProvince(Number(selectedProvince)),
+          transactionsApi.getByProvince(Number(selectedProvince), exercice),
+          plafondsApi.getByProvince(Number(selectedProvince), exercice),
         ]);
       } else {
         // Filter by region (all provinces)
         [transactions, plafonds] = await Promise.all([
-          transactionsApi.getByRegion(Number(selectedRegion)),
-          plafondsApi.getByRegion(Number(selectedRegion)),
+          transactionsApi.getByRegion(Number(selectedRegion), exercice),
+          plafondsApi.getByRegion(Number(selectedRegion), exercice),
         ]);
       }
 

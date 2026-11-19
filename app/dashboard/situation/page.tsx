@@ -3,14 +3,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useExercice } from "@/lib/exercice-context";
 import {
     ApiError,
+    exercicesApi,
     provincesApi,
     regionsApi,
     situationApi,
     versementsApi,
 } from "@/lib/api";
-import type { Province, Region, SituationRow } from "@/lib/types";
+import type { CloturePrecheck, Province, Region, SituationRow } from "@/lib/types";
 import {
     SITUATION_HEADERS,
     computeTotals,
@@ -33,6 +35,7 @@ import {
     FileText,
     HandCoins,
     Loader2,
+    Lock,
     RefreshCw,
     Search,
     X,
@@ -56,6 +59,7 @@ const selectClass =
 export default function SituationPage() {
     const { user } = useAuth();
     const router = useRouter();
+    const { exercice, ready: exerciceReady, info: exerciceInfo, refresh: refreshExercices, isEditableFor } = useExercice();
 
     const [rows, setRows] = useState<SituationRow[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
@@ -64,7 +68,6 @@ export default function SituationPage() {
     const [exporting, setExporting] = useState<"pdf" | "excel" | null>(null);
     const [error, setError] = useState("");
 
-    const [exercice, setExercice] = useState(new Date().getFullYear());
     const [arreteAu, setArreteAu] = useState(today());
     const [filterRegion, setFilterRegion] = useState("");
     const [filterProvince, setFilterProvince] = useState("");
@@ -77,6 +80,7 @@ export default function SituationPage() {
         dateVersement: today(),
         reference: "",
         commentaire: "",
+        type: "VERSEMENT" as "VERSEMENT" | "ANNULATION",
     });
     const [versementSubmitting, setVersementSubmitting] = useState(false);
     const [versementError, setVersementError] = useState("");
@@ -87,7 +91,17 @@ export default function SituationPage() {
         }
     }, [user, router]);
 
+    // Clôture de l'exercice (admin)
+    const [clotureProvince, setClotureProvince] = useState("");
+    const [cloturePrecheck, setCloturePrecheck] = useState<CloturePrecheck | null>(null);
+    const [clotureChecking, setClotureChecking] = useState(false);
+    const [clotureConfirm, setClotureConfirm] = useState(false);
+    const [clotureSubmitting, setClotureSubmitting] = useState(false);
+    const [clotureMessage, setClotureMessage] = useState("");
+    const [clotureError, setClotureError] = useState("");
+
     const fetchData = useCallback(async () => {
+        if (!exerciceReady) return;
         setLoading(true);
         setError("");
         try {
@@ -105,7 +119,7 @@ export default function SituationPage() {
         } finally {
             setLoading(false);
         }
-    }, [exercice, arreteAu]);
+    }, [exercice, exerciceReady, arreteAu]);
 
     useEffect(() => {
         fetchData();
@@ -128,7 +142,7 @@ export default function SituationPage() {
 
     const openVersement = (row: SituationRow) => {
         setVersementModal(row);
-        setVersementForm({ montant: "", dateVersement: today(), reference: "", commentaire: "" });
+        setVersementForm({ montant: "", dateVersement: today(), reference: "", commentaire: "", type: "VERSEMENT" });
         setVersementError("");
     };
 
@@ -143,6 +157,7 @@ export default function SituationPage() {
                 dateVersement: versementForm.dateVersement || undefined,
                 reference: versementForm.reference || undefined,
                 commentaire: versementForm.commentaire || undefined,
+                type: versementForm.type,
             });
             setVersementModal(null);
             await fetchData();
@@ -173,6 +188,44 @@ export default function SituationPage() {
     const totals = useMemo(() => computeTotals(filteredRows), [filteredRows]);
 
     const canVersement = !!user && VERSEMENT_ROLES.includes(user.role);
+    const canCloturer = !!exerciceInfo?.peutCloturer;
+    const provincesOuvertes = (exerciceInfo?.provinces ?? []).filter((p) => p.exerciceCourant === exercice);
+
+    const runPrecheck = async (provinceId: string) => {
+        setClotureProvince(provinceId);
+        setCloturePrecheck(null);
+        setClotureMessage("");
+        setClotureError("");
+        if (!provinceId) return;
+        setClotureChecking(true);
+        try {
+            setCloturePrecheck(await exercicesApi.precheck(Number(provinceId), exercice));
+        } catch (err) {
+            setClotureError(err instanceof ApiError ? err.message : "Erreur lors de la vérification.");
+        } finally {
+            setClotureChecking(false);
+        }
+    };
+
+    const submitCloture = async () => {
+        if (!clotureProvince) return;
+        setClotureSubmitting(true);
+        setClotureError("");
+        try {
+            const res = await exercicesApi.cloturer(Number(clotureProvince), exercice);
+            setClotureConfirm(false);
+            setClotureMessage(`Exercice ${exercice} clôturé pour ${res.provinceName}. Les plafonds de ${exercice + 1} ont été remis à zéro.`);
+            setClotureProvince("");
+            setCloturePrecheck(null);
+            await refreshExercices();
+            await fetchData();
+        } catch (err) {
+            setClotureConfirm(false);
+            setClotureError(err instanceof ApiError ? err.message : "Erreur lors de la clôture.");
+        } finally {
+            setClotureSubmitting(false);
+        }
+    };
     const isProv = user?.role === "PROV";
     const isRegionScoped = user?.role === "REGION" || user?.role === "VIEW_REGION";
     const availableProvinces = provinces.filter(
@@ -257,17 +310,6 @@ export default function SituationPage() {
             )}
 
             <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                    Exercice
-                    <Input
-                        type="number"
-                        className="w-24"
-                        value={exercice}
-                        min={2000}
-                        max={2100}
-                        onChange={(e) => setExercice(Number(e.target.value) || new Date().getFullYear())}
-                    />
-                </label>
                 <label className="flex items-center gap-2 text-sm">
                     Arrêtée au
                     <Input
@@ -354,7 +396,7 @@ export default function SituationPage() {
                                 </thead>
                                 <tbody>
                                     {filteredRows.map((r) => (
-                                        <tr key={r.plafondId} className="hover:bg-muted/40">
+                                        <tr key={`${r.provinceId}-${r.compteCode}`} className="hover:bg-muted/40">
                                             <td className="border border-border px-3 py-2 italic">{r.dr}</td>
                                             <td className="border border-border px-3 py-2 font-semibold">{r.dp}</td>
                                             <td className="border border-border px-3 py-2 font-semibold whitespace-nowrap">{r.compteCode}</td>
@@ -367,14 +409,18 @@ export default function SituationPage() {
                                             <td className={`border border-border font-bold ${numCell}`}>{formatNumber(r.solde)}</td>
                                             {canVersement && (
                                                 <td className="border border-border px-2 py-1 text-center">
+                                                    {r.cloture || !isEditableFor(r.provinceId) ? (
+                                                        <span title="Exercice clôturé"><Lock className="mx-auto h-4 w-4 text-muted-foreground" /></span>
+                                                    ) : (
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        title="Enregistrer un versement"
+                                                        title="Enregistrer un versement / une annulation"
                                                         onClick={() => openVersement(r)}
                                                     >
                                                         <HandCoins className="h-4 w-4" />
                                                     </Button>
+                                                    )}
                                                 </td>
                                             )}
                                         </tr>
@@ -400,10 +446,104 @@ export default function SituationPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {canCloturer && (
+                <Card>
+                    <CardContent className="space-y-4 p-6">
+                        <div className="flex items-center gap-2">
+                            <Lock className="h-5 w-5 text-[#1A3A8A]" />
+                            <h2 className="text-lg font-bold text-[#0A1A44]">Clôturer l&apos;exercice {exercice}</h2>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            La clôture se fait province par province. Une fois clôturé, l&apos;exercice {exercice} est
+                            conservé en lecture seule (consultable par l&apos;administration et la région concernée).
+                            Pour {exercice + 1} : le disponible par rubrique redevient égal au plafond, l&apos;encaissement
+                            passe à 0 et le plafond max facture est inchangé. La clôture est impossible tant qu&apos;un
+                            solde est non nul ou qu&apos;une dépense est en attente.
+                        </p>
+                        {clotureMessage && (
+                            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                                {clotureMessage}
+                            </div>
+                        )}
+                        {clotureError && (
+                            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                {clotureError}
+                            </div>
+                        )}
+                        {provincesOuvertes.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                Aucune province n&apos;a l&apos;exercice {exercice} ouvert.
+                            </p>
+                        ) : (
+                            <div className="flex flex-wrap items-center gap-3">
+                                <select
+                                    className={selectClass}
+                                    value={clotureProvince}
+                                    onChange={(e) => runPrecheck(e.target.value)}
+                                >
+                                    <option value="">Choisir une province...</option>
+                                    {provincesOuvertes.map((p) => (
+                                        <option key={p.provinceId} value={p.provinceId}>
+                                            {p.provinceName}
+                                        </option>
+                                    ))}
+                                </select>
+                                <Button
+                                    variant="destructive"
+                                    disabled={!cloturePrecheck?.cloturable || clotureChecking}
+                                    onClick={() => setClotureConfirm(true)}
+                                >
+                                    {clotureChecking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Clôturer l&apos;exercice {exercice}
+                                </Button>
+                            </div>
+                        )}
+                        {cloturePrecheck && !cloturePrecheck.cloturable && (
+                            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                                <p className="mb-1 font-semibold">Clôture impossible pour {cloturePrecheck.provinceName} :</p>
+                                <ul className="list-disc pl-5">
+                                    {cloturePrecheck.blocages.map((b) => (
+                                        <li key={b}>{b}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        {cloturePrecheck?.cloturable && (
+                            <p className="text-sm text-green-700">
+                                {cloturePrecheck.provinceName} : tous les soldes sont à 0 et aucune dépense n&apos;est en attente.
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            <Dialog open={clotureConfirm} onOpenChange={(open) => !open && setClotureConfirm(false)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Confirmer la clôture</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm">
+                        Clôturer l&apos;exercice <strong>{exercice}</strong> de{" "}
+                        <strong>{cloturePrecheck?.provinceName}</strong> ? Cette action est définitive : les données{" "}
+                        {exercice} ne seront plus modifiables.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setClotureConfirm(false)}>
+                            Annuler
+                        </Button>
+                        <Button variant="destructive" onClick={submitCloture} disabled={clotureSubmitting}>
+                            {clotureSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Clôturer définitivement
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
             <Dialog open={!!versementModal} onOpenChange={(open) => !open && setVersementModal(null)}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Enregistrer un versement</DialogTitle>
+                        <DialogTitle>Enregistrer un versement / une annulation</DialogTitle>
                     </DialogHeader>
                     {versementModal && (
                         <form onSubmit={submitVersement} className="flex flex-col gap-4">
@@ -411,8 +551,8 @@ export default function SituationPage() {
                                 {versementModal.dp} — compte{" "}
                                 <span className="font-mono">{versementModal.compteCode}</span>
                                 <br />
-                                Encaissement disponible:{" "}
-                                <strong>{formatNumber(versementModal.disponibleEncaisse)} DH</strong>
+                                Solde disponible:{" "}
+                                <strong>{formatNumber(versementModal.solde)} DH</strong>
                             </p>
                             {versementError && (
                                 <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
@@ -421,19 +561,32 @@ export default function SituationPage() {
                                 </div>
                             )}
                             <div className="flex flex-col gap-2">
-                                <Label className="text-xs font-semibold">Montant du versement (DH) *</Label>
+                                <Label className="text-xs font-semibold">Type *</Label>
+                                <select
+                                    className={selectClass}
+                                    value={versementForm.type}
+                                    onChange={(e) =>
+                                        setVersementForm({ ...versementForm, type: e.target.value as "VERSEMENT" | "ANNULATION" })
+                                    }
+                                >
+                                    <option value="VERSEMENT">Versement</option>
+                                    <option value="ANNULATION">Annulation</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label className="text-xs font-semibold">Montant (DH) *</Label>
                                 <Input
                                     type="number"
                                     step="0.01"
                                     min="0.01"
-                                    max={versementModal.disponibleEncaisse}
+                                    max={versementModal.solde}
                                     required
                                     value={versementForm.montant}
                                     onChange={(e) => setVersementForm({ ...versementForm, montant: e.target.value })}
                                 />
                             </div>
                             <div className="flex flex-col gap-2">
-                                <Label className="text-xs font-semibold">Date du versement</Label>
+                                <Label className="text-xs font-semibold">Date</Label>
                                 <Input
                                     type="date"
                                     value={versementForm.dateVersement}
